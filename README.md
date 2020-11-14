@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/trueb2/hetnetdb/workflows/main.yml/badge.svg)](https://github.com/trueb2/hetnetdb/actions)
+[![Actions Status](https://github.com/trueb2/hetnetdb/workflows/main/badge.svg)](https://github.com/trueb2/hetnetdb/actions)
 
 
 # HETNETDB
