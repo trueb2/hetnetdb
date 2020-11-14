@@ -1,3 +1,6 @@
+[![Actions Status](https://github.com/trueb2/hetnetdb/workflows/main.yml/badge.svg)](https://github.com/trueb2/hetnetdb/actions)
+
+
 # HETNETDB
 
 Hetnetdb is a database that is intended to be extremely flexible and easy to use. In hetnetdb (het, short for heteorogenous, and net, short for networked), the goal is to provide easy access to data in heterogeneous storage platforms and networks via SQL queries. Goals of the database include supporting CSV and JSON stored on multiple storage platforms including local, server, edge, and streaming. To achieve this goal, there will be agent support for browser, iOS, android, linux, and macOS. (Not windows, we specifically don't want to support windows users!). Computational operations will be executed by opaque HTTP endpoints for extreme ease of use.
