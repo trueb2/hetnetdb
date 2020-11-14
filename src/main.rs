@@ -19,6 +19,7 @@ mod error_handler;
 mod schema;
 
 mod health;
+mod query;
 
 macro_rules! AppFactory {
     () => {
@@ -39,6 +40,7 @@ macro_rules! AppFactory {
                     srv.call(req)
                 })
                 .configure(health::init_routes)
+                .configure(query::init_routes)
         }
     };
 }

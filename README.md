@@ -16,9 +16,9 @@ Before defining terms, let's define a teir list: Good(TG), Bad(TB), and Ugly(TU)
 * Query Server: This is a host in the cloud. This runs the HTTP Server with endpoints for submitting query requests, requesting execution, etc. Generally, a Query Server should be TG.
 * Agent: This is a host of executors. Agents are heterogenous in hetnetdb with sets of capabilities all over the teir list. Agents should not share resources with other agents, unless they have TU rankings. Agents may manage executors to retry or balance workloads, but when they fail to find an acceptable executor configuration, the query fails.
 * Executor: The actual data manipulation happens inside of an executor. They respect their resource limitations and do their best to complete a job. They are fully independent from each other. They produce either results or maybe recoverable errors.
-* Compiler: The interface for accessing data is SQL. The Compiler will turn your query into an error message or an execution graph.
+* parser: The interface for accessing data is SQL. The parser will turn your query into an error message or an execution graph.
 * Execution Nodes: These are the high level todo list for the query. The Query Server keeps track of agents and delegates nodes to agents as it traverses the execution graph
-* Execution Graph: The execution graph is the compiled plan for executing Execution Nodes. Every query has one graph pending finalization as error or results.
+* Execution Graph: The execution graph is the parsed plan for executing Execution Nodes. Every query has one graph pending finalization as error or results.
 
 
 ## Topologies
@@ -55,4 +55,37 @@ There are a couple important workloads considering target datasets will include 
 Realistically, with the target architectures for v0, the best we can hope for is sub-second latency. With on-the-fly data parsing and HTTP servers at every hop of the execution graph, 500ms query execution time would be amazing. As agents enter the pool and indexes get more complicated new goals for new workloads will be established.
 
 
+## Development
 
+1. Install: cargo, libpq, diesel_cli (with postgres), systemfd, cargo-watch
+2. Build/Test: `cargo build` or `cargo test`
+3. Run dev server: `systemfd --no-pid -s http::6969 -- cargo watch -x run`
+4. Run prod server: `cargo run --release`
+
+## Example Usage
+
+1. Install httpie
+2. Submit the query to the endpoint piecewise or wholesale:
+
+```
+jwtrueb@jbmp hetnetdb % echo '{ "text": "SELECT count(*) from agents" }' | http post :6969/query/submit
+HTTP/1.1 200 OK
+content-length: 87
+content-type: application/json
+date: Sat, 14 Nov 2020 21:23:58 GMT
+
+{
+    "records": [
+        {
+            "columns": [
+                {
+                    "i64": 42
+                }
+            ],
+            "ready": {
+                "dt_utc": "2020-11-14T21:23:58.730786Z"
+            }
+        }
+    ]
+}
+```

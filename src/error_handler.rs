@@ -80,6 +80,12 @@ impl From<actix_web_httpauth::extractors::AuthenticationError<actix_web_httpauth
     }
 }
 
+impl From<&str> for CustomError {
+    fn from(error: &str) -> CustomError {
+        CustomError { error_message: format!("Bad request: {}", error), error_status_code: 400 }
+    }
+}
+
 impl ResponseError for CustomError {
     fn error_response(&self) -> HttpResponse {
         let status_code = match StatusCode::from_u16(self.error_status_code) {

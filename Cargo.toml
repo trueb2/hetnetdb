@@ -17,6 +17,7 @@ chrono = { version = "0.4.19", features = ["serde"] }
 dotenv = "0.15.0"
 diesel = { version = "1.4.5", features = ["postgres", "r2d2", "uuid", "chrono"] }
 diesel_migrations = "1.4.0"
+dyn-clone = "1.0.3"
 env_logger = "0.8.1"
 futures = { version = "0.3.7", features = ["compat"] }
 futures-util = "0.3.7"
@@ -31,3 +32,4 @@ r2d2 = "0.8.9"
 rand = "0.7.3"
 rust-crypto = "0.2"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
+typetag = "0.1.6"
