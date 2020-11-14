@@ -1,7 +1,7 @@
+use super::execute::Execution;
+use super::query::{Query, QueryResult};
 use crate::error_handler::CustomError;
 use actix_web::{post, web, HttpResponse};
-use super::query::{Query, QueryResult};
-use super::execute::{Execution};
 
 #[post("/query/submit")]
 async fn submit(query: web::Json<Query>) -> Result<HttpResponse, CustomError> {
@@ -70,18 +70,30 @@ mod tests {
     #[actix_rt::test]
     async fn submit_basic_query() {
         let text: String = "SELECT COUNT(*) FROM FOO;".into();
-        serde_json::to_string(&Query { text, ..Default::default() }).unwrap();
+        serde_json::to_string(&Query {
+            text,
+            ..Default::default()
+        })
+        .unwrap();
     }
 
     #[actix_rt::test]
     async fn submit_query_with_double_quotes() {
         let text: String = "SELECT COUNT(*) FROM FOO WHERE row = \"asdf\";".into();
-        serde_json::to_string(&Query { text, ..Default::default() }).unwrap();
+        serde_json::to_string(&Query {
+            text,
+            ..Default::default()
+        })
+        .unwrap();
     }
 
     #[actix_rt::test]
     async fn submit_query_with_single_quotes() {
         let text: String = "SELECT COUNT(*) FROM FOO WHERE row = 'asdf';".into();
-        serde_json::to_string(&Query { text, ..Default::default() }).unwrap();
+        serde_json::to_string(&Query {
+            text,
+            ..Default::default()
+        })
+        .unwrap();
     }
 }

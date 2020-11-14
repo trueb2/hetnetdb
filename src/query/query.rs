@@ -1,28 +1,26 @@
+use super::sql_types::*;
 use crate::error_handler::CustomError;
 use chrono::{DateTime, Utc};
-use nom_sql::SqlQuery;
 use nom_sql::parser::parse_query;
+use nom_sql::SqlQuery;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use serde::{Serialize, Deserialize};
-use super::sql_types::*;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Query {
     pub text: String,
     pub parse: Option<SqlQuery>,
-    pub optimal_parse: Option<SqlQuery>
+    pub optimal_parse: Option<SqlQuery>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordTime {
-    pub dt_utc: DateTime<Utc>
+    pub dt_utc: DateTime<Utc>,
 }
 
 impl Default for RecordTime {
     fn default() -> Self {
-        RecordTime {
-            dt_utc: Utc::now()
-        }
+        RecordTime { dt_utc: Utc::now() }
     }
 }
 
@@ -68,31 +66,42 @@ mod tests {
     #[actix_rt::test]
     async fn parse_basic_query() {
         let text: String = "SELECT * FROM FOO;".into();
-        let query = Query::parse(&Query { text, ..Default::default() });
+        let query = Query::parse(&Query {
+            text,
+            ..Default::default()
+        });
         query.unwrap();
     }
 
     #[actix_rt::test]
     async fn parse_less_simple_query() {
         let text: String = "SELECT * FROM BAR GROUP BY BAR.a ORDER BY BAR.a DESC LIMIT 15".into();
-        let query = Query::parse(&Query { text, ..Default::default() });
+        let query = Query::parse(&Query {
+            text,
+            ..Default::default()
+        });
         query.unwrap();
     }
 
     #[actix_rt::test]
     async fn parse_common_table_expression_simple_query() {
         let text: String = "WITH FOO AS (SELECT * FROM BAR) SELECT * FROM FOO;".into();
-        let query = Query::parse(&Query { text, ..Default::default() });
+        let query = Query::parse(&Query {
+            text,
+            ..Default::default()
+        });
         assert!(query.is_err());
     }
 
     #[actix_rt::test]
     async fn optimize_less_simple_query() {
         let text: String = "SELECT * FROM BAR GROUP BY BAR.a ORDER BY BAR.a DESC LIMIT 15".into();
-        let query = Query::parse(&Query { text, ..Default::default() });
+        let query = Query::parse(&Query {
+            text,
+            ..Default::default()
+        });
         let query = query.unwrap();
         let query = Query::optimize(&query).unwrap();
         assert_eq!(query.parse, query.optimal_parse);
-
     }
 }
