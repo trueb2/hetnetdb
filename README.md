@@ -26,7 +26,7 @@ Before defining terms, let's define a teir list: Good(TG), Bad(TB), and Ugly(TU)
 
 ## Topologies
 
-Obviously, there are some ambitions goals that aren't going to be completed any time soon.
+Obviously, there are some ambitious goals that aren't going to be completed any time soon.
 
 ### v0 target topologies
 
@@ -92,3 +92,63 @@ date: Sat, 14 Nov 2020 21:23:58 GMT
     ]
 }
 ```
+
+# Feature Roadmap and Wish List
+
+While in the early stages of the project, this TODO list will hold the temporary feature roadmap.
+
+- [x] Create an HTTP Server to route all actions through. All requests will perform message passing via HTTP requests and manipulate shared state by transacting with postgres.
+- [x] Create routes for submitting select queries:
+    - [x] To try to parse a SQL query
+    - [x] To optimize a SQL query
+    - [x] To execute an optimized SQL query
+    - [x] To submit an unchecked SQL query and wait for results
+- [ ] Inflate an optimized query into an execution graph
+- [ ] Create execution nodes for data _
+    - [ ] Data filtering: WHERE
+    - [ ] Data grouping: GROUP BY
+    - [ ] Data ordering: ORDER BY
+    - [ ] Data functions:
+        - [ ] COUNT(*)
+        - [ ] COUNT()
+        - [ ] COUNT(DISTINCT)
+        - [ ] min
+        - [ ] max
+        - [ ] avg
+        - [ ] ?stddev
+- [ ] Create execution nodes for data load
+    - [ ] Data limiting: LIMIT
+    - [ ] Data offset: OFFSET
+- [ ] Create routes for data load with schema enforcement
+    - [ ] To upload CSV to be cached
+    - [ ] To parse CSV that is cached
+    - [ ] To stream CSV into cached table
+    - [ ] To register S3 configs to download the data (via HTTP request)
+    - [ ] To register agent configs to process data locally (requires agency CLI/daemon services)
+- [ ] Create agency CLI
+    - [ ] Register capabilities
+    - [ ] Heartbeat system load
+    - [ ] Mark registration in computational group
+    - [ ] Mark registration in storage group
+    - [ ] Process compute events from Query Server Service
+    - [ ] Process storage events from Query Server Service
+- [ ] Configuring a monitoring dashboard
+    - [ ] TICK stack
+    - [ ] LogDNA event tracing for inidividual queries
+- [ ] Create an execution graph visualization tool
+
+# Improvement Wish List
+
+- [ ] Create execution cost models and benchmarks
+- [ ] Improve query optimization
+- [ ] Improve execution graph inflation
+- [ ] Add JSON support for CSV whereever CSV is referenced
+    - [ ] Pick a faster serde format too
+- [ ] Re-route workloads on heartbeat system load events
+- [ ] Switch to a different parser that supports
+    - [ ] Common Table Expressions
+    - [ ] Window Functions
+    - [ ] Reasonably Abritrary Syntax Expansions
+- [ ] Run a benchmark on about 1B rows and/or 100GB uncompressed CSV
+- [ ] Run an agency CLI service on something that produces rows by streaming from an edge device
+- [ ] Provide reliability mechanisms for tracking ingestion of partially ingested data (after endpoint before rest).
