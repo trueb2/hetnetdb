@@ -28,7 +28,7 @@ RUN . $HOME/.shrc && \
     pg_ctlcluster 12 main start -- -t 300 && \
     su - postgres -c "psql -U postgres -c \"alter user postgres with password 'postgres';\"" && \
     cd /home/app && \
-    diesel setup --database-url postgres://postgres:postgres@localhost/asset_api
+    diesel setup --database-url postgres://postgres:postgres@localhost/hetnetdb
 
 ARG CARGO_FLAGS
 RUN cd /home/app && . $HOME/.shrc && \
