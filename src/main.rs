@@ -278,7 +278,6 @@ mod tests {
             .set_payload(payload.clone())
             .to_request();
         let resp: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
-        log::debug!("Created Table Schema: {:?}", resp);
 
         let req = test::TestRequest::get()
             .uri(format!("/table_schemas/id/{}", resp.id).as_str())
@@ -288,7 +287,6 @@ mod tests {
             )
             .to_request();
         let resp1: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
-        log::debug!("Found Table Schema by {}: {:?}", resp.id, &resp1);
         assert_eq!(table_schema, table_schemas::MaybeTableSchema::from(resp1));
 
         let req = test::TestRequest::get()
@@ -301,7 +299,6 @@ mod tests {
             .set_payload(payload.clone())
             .to_request();
         let resp2: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
-        log::debug!("Found Table Schema by {}: {:?}", payload, &resp2);
         assert_eq!(table_schema, table_schemas::MaybeTableSchema::from(resp2));
 
         let req = test::TestRequest::delete()
@@ -314,5 +311,78 @@ mod tests {
             .to_request();
         let resp = test::call_service(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn test_use_tables() {
+        setup();
+
+        let mut app = test::init_service(AppFactory!()()).await;
+
+        let table_schema = table_schemas::MaybeTableSchema {
+            column_types: ["string", "i64", "f64"]
+                .iter()
+                .map(|s| String::from(*s))
+                .collect(),
+        };
+        let payload = serde_json::to_string(&table_schema).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/table_schemas")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let table_schema: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
+
+        let maybe_table = tables::MaybeTable {
+            table_schema_id: table_schema.id,
+            name: "first_table".into(),
+        };
+        let payload = serde_json::to_string(&maybe_table).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/tables")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let resp: tables::ATable = test::read_response_json(&mut app, req).await;
+        assert_eq!(maybe_table, tables::MaybeTable::from(resp.clone()));
+
+        let maybe_table = tables::MaybeTable {
+            table_schema_id: table_schema.id,
+            name: "renamed_first_table".into(),
+        };
+        let payload = serde_json::to_string(&maybe_table).expect("Invalid value");
+
+        let req = test::TestRequest::put()
+            .uri(format!("/tables/{}", resp.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let resp: tables::ATable = test::read_response_json(&mut app, req).await;
+        assert_eq!(maybe_table, tables::MaybeTable::from(resp.clone()));
+
+        let req = test::TestRequest::delete()
+            .uri(format!("/tables/{}", resp.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .to_request();
+        let resp: tables::ATable = test::read_response_json(&mut app, req).await;
+        assert_eq!(maybe_table, tables::MaybeTable::from(resp));
     }
 }

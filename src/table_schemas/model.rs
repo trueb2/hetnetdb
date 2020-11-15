@@ -23,10 +23,10 @@ pub struct MaybeTableSchema {
 impl TableSchema {
     pub fn find_by_id(id: i64) -> Result<TableSchema, CustomError> {
         let conn = db::connection()?;
-        let table = table_schemas::table
+        let table_schema = table_schemas::table
             .filter(table_schemas::id.eq(id))
             .first(&conn)?;
-        Ok(table)
+        Ok(table_schema)
     }
 
     pub fn find_by_types(maybe_table_schema: MaybeTableSchema) -> Result<TableSchema, CustomError> {
