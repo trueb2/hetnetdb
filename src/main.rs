@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
@@ -20,6 +21,7 @@ mod schema;
 
 mod health;
 mod query;
+mod users;
 
 macro_rules! AppFactory {
     () => {
@@ -41,6 +43,7 @@ macro_rules! AppFactory {
                 })
                 .configure(health::init_routes)
                 .configure(query::init_routes)
+                .configure(users::init_routes)
         }
     };
 }
@@ -70,8 +73,9 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App};
+    use actix_web::{test, App, http::StatusCode};
     use lazy_static::lazy_static;
+    use std::convert::TryInto;
 
     lazy_static! {
         static ref FIXTURE: () = {
@@ -81,11 +85,21 @@ mod tests {
             auth::init();
             ()
         };
+        static ref ADMIN_USER: users::AuthUser = {
+            let user = users::User::create(users::MaybeUser {
+                username: "hnadmin".into(),
+                password: "hnadmin".into(),
+            })
+            .expect("Failed to create test admin user");
+            user.try_into().expect("Failed to create auth user")
+        };
     }
 
     pub fn setup() {
         lazy_static::initialize(&FIXTURE);
+        lazy_static::initialize(&ADMIN_USER);
     }
+
     #[actix_rt::test]
     async fn test_health_get_without_token() {
         setup();
@@ -93,5 +107,152 @@ mod tests {
         let mut app = test::init_service(AppFactory!()()).await;
         let req = test::TestRequest::get().uri("/health").to_request();
         let _resp = test::read_response(&mut app, req).await;
+    }
+
+    #[actix_rt::test]
+    async fn test_create_and_use_user() {
+        setup();
+
+        let mut app = test::init_service(AppFactory!()()).await;
+
+        let user = users::MaybeUser {
+            username: String::from("foo"),
+            password: String::from("secretpassword"),
+        };
+        let payload = serde_json::to_string(&user).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/users")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload)
+            .to_request();
+        let resp: users::AuthUser = test::read_response_json(&mut app, req).await;
+        log::info!("Created User: {:?}", resp);
+
+        let req = test::TestRequest::get()
+            .uri("/auth")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", resp.token).as_str(),
+            )
+            .to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn test_user_cant_change_other_users() {
+        setup();
+
+        let mut app = test::init_service(AppFactory!()()).await;
+
+        // Create user1
+        let maybe_user = users::MaybeUser {
+            username: String::from("user1"),
+            password: String::from("secretpassword"),
+        };
+        let payload = serde_json::to_string(&maybe_user).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/users")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload)
+            .to_request();
+        let user1: users::AuthUser = test::read_response_json(&mut app, req).await;
+        log::info!("Created User: {:?}", user1);
+
+        // Change user1's password as user1
+        let maybe_user = users::MaybeUser {
+            username: String::from("user1"),
+            password: String::from("newsecretpassword"),
+        };
+        let payload = serde_json::to_string(&maybe_user).expect("Invalid value");
+
+        let req = test::TestRequest::put()
+            .uri(format!("/users/{}", user1.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", user1.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload)
+            .to_request();
+        let user1: users::AuthUser = test::read_response_json(&mut app, req).await;
+        log::info!("Updated User: {:?}", user1);
+
+        // Use user1's new token
+        let req = test::TestRequest::get()
+            .uri("/auth")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", user1.token).as_str(),
+            )
+            .to_request();
+        let protected_resp = test::call_service(&mut app, req).await;
+        assert_eq!(protected_resp.status(), StatusCode::OK);
+
+        // Create user2
+        let maybe_user = users::MaybeUser {
+            username: String::from("user2"),
+            password: String::from("secretpassword"),
+        };
+        let payload = serde_json::to_string(&maybe_user).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/users")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload)
+            .to_request();
+        let user2: users::AuthUser = test::read_response_json(&mut app, req).await;
+        log::info!("Created User: {:?}", user2);
+
+        // Fail to change user1's password
+        let payload = serde_json::to_string(&maybe_user).expect("Invalid value");
+
+        let req = test::TestRequest::put()
+            .uri(format!("/users/{}", user1.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", user2.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload)
+            .to_request();
+        let protected_resp = test::call_service(&mut app, req).await;
+        assert_eq!(protected_resp.status(), StatusCode::UNAUTHORIZED);
+
+        // Use user1's token
+        let req = test::TestRequest::get()
+            .uri("/auth")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", user1.token).as_str(),
+            )
+            .to_request();
+        let protected_resp = test::call_service(&mut app, req).await;
+        assert_eq!(protected_resp.status(), StatusCode::OK);
+
+        // Use user2's token
+        let req = test::TestRequest::get()
+            .uri("/auth")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", user2.token).as_str(),
+            )
+            .to_request();
+        let protected_resp = test::call_service(&mut app, req).await;
+        assert_eq!(protected_resp.status(), StatusCode::OK);
     }
 }

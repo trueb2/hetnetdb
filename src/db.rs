@@ -15,7 +15,7 @@ lazy_static! {
     static ref POOL: Pool = {
         let (db_url, pool_size) = match cfg!(test) {
             true => (
-                String::from("postgres://postgres:postgres@localhost/asset_api"),
+                env::var("TEST_DATABASE_URL").expect("Database url not set"),
                 1,
             ),
             false => (env::var("DATABASE_URL").expect("Database url not set"), 10),
