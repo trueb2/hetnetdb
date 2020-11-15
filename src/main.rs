@@ -21,6 +21,8 @@ mod schema;
 
 mod health;
 mod query;
+mod table_schemas;
+mod tables;
 mod users;
 
 macro_rules! AppFactory {
@@ -44,6 +46,8 @@ macro_rules! AppFactory {
                 .configure(health::init_routes)
                 .configure(query::init_routes)
                 .configure(users::init_routes)
+                .configure(tables::init_routes)
+                .configure(table_schemas::init_routes)
         }
     };
 }
@@ -73,7 +77,7 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App, http::StatusCode};
+    use actix_web::{http::StatusCode, test, App};
     use lazy_static::lazy_static;
     use std::convert::TryInto;
 
@@ -178,10 +182,7 @@ mod tests {
 
         let req = test::TestRequest::put()
             .uri(format!("/users/{}", user1.id).as_str())
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", user1.token),
-            )
+            .header(header::AUTHORIZATION, format!("Bearer {}", user1.token))
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload)
             .to_request();
@@ -223,10 +224,7 @@ mod tests {
 
         let req = test::TestRequest::put()
             .uri(format!("/users/{}", user1.id).as_str())
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", user2.token),
-            )
+            .header(header::AUTHORIZATION, format!("Bearer {}", user2.token))
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload)
             .to_request();
@@ -254,5 +252,67 @@ mod tests {
             .to_request();
         let protected_resp = test::call_service(&mut app, req).await;
         assert_eq!(protected_resp.status(), StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn test_create_and_find_table_schemas() {
+        setup();
+
+        let mut app = test::init_service(AppFactory!()()).await;
+
+        let table_schema = table_schemas::MaybeTableSchema {
+            column_types: ["string", "i64", "f64"]
+                .iter()
+                .map(|s| String::from(*s))
+                .collect(),
+        };
+        let payload = serde_json::to_string(&table_schema).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/table_schemas")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let resp: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
+        log::debug!("Created Table Schema: {:?}", resp);
+
+        let req = test::TestRequest::get()
+            .uri(format!("/table_schemas/id/{}", resp.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .to_request();
+        let resp1: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
+        log::debug!("Found Table Schema by {}: {:?}", resp.id, &resp1);
+        assert_eq!(table_schema, table_schemas::MaybeTableSchema::from(resp1));
+
+        let req = test::TestRequest::get()
+            .uri("/table_schemas/types")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let resp2: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
+        log::debug!("Found Table Schema by {}: {:?}", payload, &resp2);
+        assert_eq!(table_schema, table_schemas::MaybeTableSchema::from(resp2));
+
+        let req = test::TestRequest::delete()
+            .uri(format!("/table_schemas/{}", resp.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }
