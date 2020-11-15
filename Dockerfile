@@ -13,7 +13,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > /home/rustup.sh 
     echo ". $HOME/.cargo/env" >> $HOME/.shrc
 
 RUN mkdir -p /home/app && \
-    echo "DATABASE_URL=postgres://postgres:postgres@localhost/hetnetdb" > /home/app/.env && \
+    echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost/hetnetdb" > /home/app/.env && \
     echo "AUTH_SECRET=ssuperspecialtestenvironmentsecretsuperspecialtestenvironmentsecretuperspecialtestenvironmentsecret" >> /home/app/.env && \
     echo "RUST_LOG=trace" >> /home/app/.env
 
