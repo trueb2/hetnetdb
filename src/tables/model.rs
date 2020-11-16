@@ -30,6 +30,15 @@ pub struct InsertableTable {
     pub size: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct ComparableTable {
+    pub id: i64,
+    pub user_id: i64,
+    pub table_schema_id: i64,
+    pub name: String,
+    pub size: i64,
+}
+
 #[derive(Debug, Serialize, Deserialize, Insertable, AsChangeset, PartialEq)]
 #[table_name = "tables"]
 pub struct MaybeTable {
@@ -64,7 +73,11 @@ impl ATable {
         Ok(table)
     }
 
-    pub fn update(user_id: i64, id: i64, insertable_table: InsertableTable) -> Result<ATable, CustomError> {
+    pub fn update(
+        user_id: i64,
+        id: i64,
+        insertable_table: InsertableTable,
+    ) -> Result<ATable, CustomError> {
         let conn = db::connection()?;
         let table = diesel::update(tables::table)
             .filter(tables::id.eq(id))
@@ -89,6 +102,18 @@ impl From<ATable> for MaybeTable {
         MaybeTable {
             table_schema_id: table.table_schema_id,
             name: table.name,
+        }
+    }
+}
+
+impl From<ATable> for ComparableTable{
+    fn from(table: ATable) -> Self {
+        ComparableTable {
+            id: table.id,
+            user_id: table.user_id,
+            table_schema_id: table.table_schema_id,
+            name: table.name,
+            size: table.size,
         }
     }
 }

@@ -77,7 +77,7 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{http::StatusCode, test, App};
+    use actix_web::{App, web::Bytes, http::StatusCode, test};
     use lazy_static::lazy_static;
     use std::convert::TryInto;
 
@@ -135,7 +135,7 @@ mod tests {
             .set_payload(payload)
             .to_request();
         let resp: users::AuthUser = test::read_response_json(&mut app, req).await;
-        log::info!("Created User: {:?}", resp);
+        log::debug!("Created User: {:?}", resp);
 
         let req = test::TestRequest::get()
             .uri("/auth")
@@ -171,7 +171,7 @@ mod tests {
             .set_payload(payload)
             .to_request();
         let user1: users::AuthUser = test::read_response_json(&mut app, req).await;
-        log::info!("Created User: {:?}", user1);
+        log::debug!("Created User: {:?}", user1);
 
         // Change user1's password as user1
         let maybe_user = users::MaybeUser {
@@ -187,7 +187,7 @@ mod tests {
             .set_payload(payload)
             .to_request();
         let user1: users::AuthUser = test::read_response_json(&mut app, req).await;
-        log::info!("Updated User: {:?}", user1);
+        log::debug!("Updated User: {:?}", user1);
 
         // Use user1's new token
         let req = test::TestRequest::get()
@@ -217,7 +217,7 @@ mod tests {
             .set_payload(payload)
             .to_request();
         let user2: users::AuthUser = test::read_response_json(&mut app, req).await;
-        log::info!("Created User: {:?}", user2);
+        log::debug!("Created User: {:?}", user2);
 
         // Fail to change user1's password
         let payload = serde_json::to_string(&maybe_user).expect("Invalid value");
@@ -336,7 +336,8 @@ mod tests {
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload.clone())
             .to_request();
-        let table_schema: table_schemas::TableSchema = test::read_response_json(&mut app, req).await;
+        let table_schema: table_schemas::TableSchema =
+            test::read_response_json(&mut app, req).await;
 
         let maybe_table = tables::MaybeTable {
             table_schema_id: table_schema.id,
@@ -384,5 +385,82 @@ mod tests {
             .to_request();
         let resp: tables::ATable = test::read_response_json(&mut app, req).await;
         assert_eq!(maybe_table, tables::MaybeTable::from(resp));
+    }
+
+    #[actix_rt::test]
+    async fn test_multipart_upload_works() {
+        // We are going to upload this data
+        let content_type = "multipart/form-data; boundary=0150c250cceb4434b3ea2f7ed7e87dfc";
+        let multipart_payload = Bytes::from("\r\n\
+             --0150c250cceb4434b3ea2f7ed7e87dfc\r\n\
+             Content-Disposition: form-data; name=\"csv\"; filename=\"sequence.csv\"\r\n\
+             Content-Type: text/csv\r\n\r\n\
+             1\n\
+             2\n\
+             3\n\
+             4\n\
+             5\n\
+             6\n\
+             7\n\
+             8\n\
+             9\n\
+             10\n\
+             \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n");
+
+        setup();
+
+        let mut app = test::init_service(AppFactory!()()).await;
+
+        let table_schema = table_schemas::MaybeTableSchema {
+            column_types: ["i64"]
+                .iter()
+                .map(|s| String::from(*s))
+                .collect(),
+        };
+        let payload = serde_json::to_string(&table_schema).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/table_schemas")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let table_schema: table_schemas::TableSchema =
+            test::read_response_json(&mut app, req).await;
+
+        let maybe_table = tables::MaybeTable {
+            table_schema_id: table_schema.id,
+            name: "integer_sequence".into(),
+        };
+        let payload = serde_json::to_string(&maybe_table).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/tables")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let table: tables::ATable = test::read_response_json(&mut app, req).await;
+        assert_eq!(maybe_table, tables::MaybeTable::from(table.clone()));
+
+        let req = test::TestRequest::post()
+            .uri(format!("/tables/upload/{}", table.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, content_type)
+            .set_payload(multipart_payload)
+            .to_request();
+        let table_after_upload: tables::ATable = test::read_response_json(&mut app, req).await;
+        let mut expected_table = table.clone();
+        expected_table.size = 21;
+        assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));
     }
 }

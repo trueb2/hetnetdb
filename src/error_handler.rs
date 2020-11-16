@@ -39,6 +39,7 @@ impl From<DieselError> for CustomError {
 
 impl From<String> for CustomError {
     fn from(error: String) -> CustomError {
+        log::error!("Internal server error: {:#?}", error);
         CustomError {
             error_message: error,
             error_status_code: 501,
@@ -47,7 +48,8 @@ impl From<String> for CustomError {
 }
 
 impl From<std::array::TryFromSliceError> for CustomError {
-    fn from(_error: std::array::TryFromSliceError) -> CustomError {
+    fn from(error: std::array::TryFromSliceError) -> CustomError {
+        log::error!("Internal server error: {:#?}", error);
         CustomError {
             error_message: String::from("Internal server error"),
             error_status_code: 501,
@@ -56,7 +58,8 @@ impl From<std::array::TryFromSliceError> for CustomError {
 }
 
 impl From<symmetriccipher::SymmetricCipherError> for CustomError {
-    fn from(_error: symmetriccipher::SymmetricCipherError) -> CustomError {
+    fn from(error: symmetriccipher::SymmetricCipherError) -> CustomError {
+        log::error!("Internal server error: {:#?}", error);
         CustomError {
             error_message: String::from("Internal server error"),
             error_status_code: 501,
@@ -65,16 +68,28 @@ impl From<symmetriccipher::SymmetricCipherError> for CustomError {
 }
 
 impl From<base64::DecodeError> for CustomError {
-    fn from(_error: base64::DecodeError) -> CustomError {
+    fn from(error: base64::DecodeError) -> CustomError {
+        log::error!("Base64 Encoding Error: {:#?}", error);
         CustomError {
-            error_message: String::from("Internal server error"),
+            error_message: String::from("Base64 Encoding Error"),
             error_status_code: 501,
         }
     }
 }
 
 impl From<std::string::FromUtf8Error> for CustomError {
-    fn from(_error: std::string::FromUtf8Error) -> CustomError {
+    fn from(error: std::string::FromUtf8Error) -> CustomError {
+        log::error!("Utf8 Encoding Error: {:#?}", error);
+        CustomError {
+            error_message: String::from("Utf8 Encoding Error"),
+            error_status_code: 501,
+        }
+    }
+}
+
+impl From<actix_web::error::BlockingError<std::io::Error>> for CustomError {
+    fn from(error: actix_web::error::BlockingError<std::io::Error>) -> CustomError {
+        log::error!("Internal server error: {:#?}", error);
         CustomError {
             error_message: String::from("Internal server error"),
             error_status_code: 501,
