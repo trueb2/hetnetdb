@@ -144,6 +144,16 @@ impl From<actix_multipart::MultipartError> for CustomError {
     }
 }
 
+impl From<csv::Error> for CustomError {
+    fn from(error: csv::Error) -> CustomError {
+        log::warn!("Csv Error: {:?}", error);
+        CustomError {
+            error_message: format!("Csv Error: {}", error),
+            error_status_code: 400
+        }
+    }
+}
+
 impl From<&str> for CustomError {
     fn from(error: &str) -> CustomError {
         CustomError {

@@ -1,5 +1,5 @@
 use super::{ATable, InsertableTable, MaybeTable};
-use crate::error_handler::CustomError;
+use crate::{AppData, error_handler::CustomError};
 use crate::table_schemas::TableSchema;
 use crate::users::User;
 use actix_multipart::Multipart;
@@ -25,6 +25,7 @@ async fn find_by_name(user: User, name: web::Path<String>) -> Result<HttpRespons
 
 #[post("/tables/upload/{id}")]
 async fn upload(
+    app_data: web::Data<AppData>,
     user: User,
     id: web::Path<i64>,
     mut uploaded_data: Multipart,
@@ -41,7 +42,7 @@ async fn upload(
     }).await?;
 
     let mut file_size: i64 = 0;
-    let mut data_buffer = Cursor::new(Vec::with_capacity(1024 * 1024));
+    let mut data_buffer = Cursor::new(Vec::with_capacity(1024));
     while let Ok(Some(mut field)) = uploaded_data.try_next().await {
         let content_disposition = field.content_disposition().unwrap();
         let filename = content_disposition.get_filename().unwrap();
@@ -57,6 +58,25 @@ async fn upload(
     }
     log::debug!("Uploaded {} to {}", file_size, file_dir);
 
+    // Extend the Data Cache
+    let uploaded_data = data_buffer.into_inner();
+    {
+        let mut table_cache_map = app_data
+            .table_cache
+            .lock()
+            .await;
+        if table_cache_map.contains_key(&table.id) {
+            table_cache_map
+                .get_mut(&table.id)
+                .unwrap()
+                .push(uploaded_data);
+        } else {
+            table_cache_map.insert(table.id.clone(), vec![uploaded_data]);
+        }
+        log::trace!("Table Cache Map: {:?}", table_cache_map);
+    }
+
+    // Update the table info
     let insertable_table = InsertableTable {
         user_id: user.id,
         table_schema_id: table.table_schema_id,

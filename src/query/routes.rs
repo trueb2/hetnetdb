@@ -1,11 +1,14 @@
+use std::sync::Arc;
+
 use super::execute::Execution;
 use super::query::{Query, QueryResult};
-use crate::error_handler::CustomError;
+use crate::{AppData, error_handler::CustomError, users::User};
 use actix_web::{post, web, HttpResponse};
 
 #[post("/query/submit")]
-async fn submit(query: web::Json<Query>) -> Result<HttpResponse, CustomError> {
+async fn submit(app_data: web::Data<AppData>, user: User, query: web::Json<Query>) -> Result<HttpResponse, CustomError> {
     let query = query.into_inner();
+    let app_data = app_data.into_inner();
     log::info!("/query/submit {:?}", query);
 
     // Parse the query
@@ -15,7 +18,7 @@ async fn submit(query: web::Json<Query>) -> Result<HttpResponse, CustomError> {
     let query = optimize_query(query).await?;
 
     // Execute the query
-    let results = execute_query(query).await?;
+    let results = execute_query(app_data, user, query).await?;
 
     Ok(HttpResponse::Ok().json(results))
 }
@@ -44,15 +47,16 @@ async fn optimize(query: web::Json<Query>) -> Result<HttpResponse, CustomError> 
     Ok(HttpResponse::Ok().json(query))
 }
 
-async fn execute_query(query: Query) -> Result<QueryResult, CustomError> {
+async fn execute_query(app_data: Arc<AppData>, user: User, query: Query) -> Result<QueryResult, CustomError> {
     log::info!("/query/execute {:?}", query);
-    let results = Execution::execute(query).await?;
+    let results = Execution::execute(app_data, user, query).await?;
     Ok(results)
 }
 
 #[post("/execute")]
-async fn execute(query: web::Json<Query>) -> Result<HttpResponse, CustomError> {
-    let result = execute_query(query.into_inner()).await?;
+async fn execute(app_data: web::Data<AppData>, user: User, query: web::Json<Query>) -> Result<HttpResponse, CustomError> {
+    let app_data = app_data.into_inner();
+    let result = execute_query(app_data, user, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

@@ -5,14 +5,15 @@ extern crate diesel_migrations;
 
 use actix_service::Service;
 use actix_web::middleware::Logger;
-use actix_web::{dev::ServiceRequest, App, HttpServer};
+use actix_web::{dev::ServiceRequest, web, App, HttpServer};
 use actix_web_httpauth::middleware::HttpAuthentication;
 
+use futures::lock::Mutex;
 use http::header;
 
 use dotenv::dotenv;
 use listenfd::ListenFd;
-use std::env;
+use std::{collections::HashMap, env};
 
 mod auth;
 mod db;
@@ -25,10 +26,15 @@ mod table_schemas;
 mod tables;
 mod users;
 
+pub struct AppData {
+    pub table_cache: Mutex<HashMap<i64, Vec<Vec<u8>>>>
+}
+
 macro_rules! AppFactory {
-    () => {
-        || {
+    ($shared_app_data:expr) => {
+        move || {
             App::new()
+                .app_data($shared_app_data)
                 .wrap(Logger::default())
                 .wrap(HttpAuthentication::bearer(auth::validator))
                 .wrap_fn(|req, srv| {
@@ -60,7 +66,12 @@ async fn main() -> std::io::Result<()> {
     auth::init();
 
     let mut listenfd = ListenFd::from_env();
-    let mut server = HttpServer::new(AppFactory!());
+
+    let app_data = web::Data::new(AppData {
+        table_cache: Mutex::new(HashMap::new()),
+    });
+    let mut server = 
+        HttpServer::new(AppFactory!(app_data.clone()));
 
     server = match listenfd.take_tcp_listener(0)? {
         Some(listener) => server.listen(listener)?,
@@ -82,6 +93,11 @@ mod tests {
     use std::convert::TryInto;
 
     lazy_static! {
+        static ref APP_DATA: web::Data<AppData> = {
+            web::Data::new(AppData {
+                table_cache: Mutex::new(HashMap::new()),
+            })
+        };
         static ref FIXTURE: () = {
             dotenv().ok();
             env_logger::init();
@@ -100,6 +116,7 @@ mod tests {
     }
 
     pub fn setup() {
+        lazy_static::initialize(&APP_DATA);
         lazy_static::initialize(&FIXTURE);
         lazy_static::initialize(&ADMIN_USER);
     }
@@ -108,7 +125,7 @@ mod tests {
     async fn test_health_get_without_token() {
         setup();
 
-        let mut app = test::init_service(AppFactory!()()).await;
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
         let req = test::TestRequest::get().uri("/health").to_request();
         let _resp = test::read_response(&mut app, req).await;
     }
@@ -117,7 +134,7 @@ mod tests {
     async fn test_create_and_use_user() {
         setup();
 
-        let mut app = test::init_service(AppFactory!()()).await;
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
 
         let user = users::MaybeUser {
             username: String::from("foo"),
@@ -152,7 +169,7 @@ mod tests {
     async fn test_user_cant_change_other_users() {
         setup();
 
-        let mut app = test::init_service(AppFactory!()()).await;
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
 
         // Create user1
         let maybe_user = users::MaybeUser {
@@ -258,7 +275,7 @@ mod tests {
     async fn test_create_and_find_table_schemas() {
         setup();
 
-        let mut app = test::init_service(AppFactory!()()).await;
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
 
         let table_schema = table_schemas::MaybeTableSchema {
             column_types: ["string", "i64", "f64"]
@@ -317,7 +334,7 @@ mod tests {
     async fn test_use_tables() {
         setup();
 
-        let mut app = test::init_service(AppFactory!()()).await;
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
 
         let table_schema = table_schemas::MaybeTableSchema {
             column_types: ["string", "i64", "f64"]
@@ -389,6 +406,10 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_multipart_upload_works() {
+        setup();
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
+        let table_name = "test_multipart_upload_works";
+
         // We are going to upload this data
         let content_type = "multipart/form-data; boundary=0150c250cceb4434b3ea2f7ed7e87dfc";
         let multipart_payload = Bytes::from("\r\n\
@@ -407,9 +428,6 @@ mod tests {
              10\n\
              \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n");
 
-        setup();
-
-        let mut app = test::init_service(AppFactory!()()).await;
 
         let table_schema = table_schemas::MaybeTableSchema {
             column_types: ["i64"]
@@ -433,7 +451,7 @@ mod tests {
 
         let maybe_table = tables::MaybeTable {
             table_schema_id: table_schema.id,
-            name: "integer_sequence".into(),
+            name: table_name.into(),
         };
         let payload = serde_json::to_string(&maybe_table).expect("Invalid value");
 
@@ -462,5 +480,95 @@ mod tests {
         let mut expected_table = table.clone();
         expected_table.size = 21;
         assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));
+    }
+
+    #[actix_rt::test]
+    async fn test_count_star() {
+        setup();
+        let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;
+        let table_name = "test_count_star";
+
+        // We are going to upload this data
+        let content_type = "multipart/form-data; boundary=0150c250cceb4434b3ea2f7ed7e87dfc";
+        let multipart_payload = Bytes::from("\r\n\
+             --0150c250cceb4434b3ea2f7ed7e87dfc\r\n\
+             Content-Disposition: form-data; name=\"csv\"; filename=\"sequence.csv\"\r\n\
+             Content-Type: text/csv\r\n\r\n\
+             1\n\
+             2\n\
+             3\n\
+             4\n\
+             5\n\
+             6\n\
+             7\n\
+             8\n\
+             9\n\
+             10\n\
+             \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n");
+
+
+        let table_schema = table_schemas::MaybeTableSchema {
+            column_types: ["i64"]
+                .iter()
+                .map(|s| String::from(*s))
+                .collect(),
+        };
+        let payload = serde_json::to_string(&table_schema).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/table_schemas")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let table_schema: table_schemas::TableSchema =
+            test::read_response_json(&mut app, req).await;
+
+        let maybe_table = tables::MaybeTable {
+            table_schema_id: table_schema.id,
+            name: table_name.into(),
+        };
+        let payload = serde_json::to_string(&maybe_table).expect("Invalid value");
+
+        let req = test::TestRequest::post()
+            .uri("/tables")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload(payload.clone())
+            .to_request();
+        let table: tables::ATable = test::read_response_json(&mut app, req).await;
+        assert_eq!(maybe_table, tables::MaybeTable::from(table.clone()));
+
+        let req = test::TestRequest::post()
+            .uri(format!("/tables/upload/{}", table.id).as_str())
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, content_type)
+            .set_payload(multipart_payload)
+            .to_request();
+        let table_after_upload: tables::ATable = test::read_response_json(&mut app, req).await;
+        let mut expected_table = table.clone();
+        expected_table.size = 21;
+        assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));        let req = test::TestRequest::post()
+            .uri("/query/submit")
+            .header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", ADMIN_USER.token),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .set_payload("{\"text\": \"select count(*) from test_count_star\"}")
+            .to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        // let result: query::QueryResult = test::read_response_json(&mut app, req).await;
+        // assert_eq!(result.records[0].columns[0]["i64"], 20);
     }
 }
