@@ -4,8 +4,8 @@ use crate::table_schemas::TableSchema;
 use crate::users::User;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
-use futures::{StreamExt, TryStreamExt};
-use std::io::Write;
+use futures::{io::Cursor, StreamExt, TryStreamExt};
+use futures_util::AsyncWriteExt;
 
 #[get("/tables/id/{id}")]
 async fn find_by_id(user: User, id: web::Path<i64>) -> Result<HttpResponse, CustomError> {
@@ -41,32 +41,19 @@ async fn upload(
     }).await?;
 
     let mut file_size: i64 = 0;
+    let mut data_buffer = Cursor::new(Vec::with_capacity(1024 * 1024));
     while let Ok(Some(mut field)) = uploaded_data.try_next().await {
         let content_disposition = field.content_disposition().unwrap();
         let filename = content_disposition.get_filename().unwrap();
         let filepath = format!("{}/{}", &file_dir, sanitize_filename::sanitize(&filename));
         log::trace!("Buffering /tables/upload/{} at {}", id, filepath);
 
-        // File::create is blocking operation, use threadpool
-        let filepath_clone = filepath.clone();
-        let mut f = web::block(|| {
-            log::trace!("Creating or opening {}", filepath_clone);
-            std::fs::File::create(filepath_clone)
-        }) .await?;
-
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
-            log::trace!("BYTES: {:#?}", data);
-            log::trace!("Writing {} bytes to {}", data.len(), &filepath);
-            // filesystem operations are blocking, we have to use threadpool
-            f = web::block(move || f.write_all(&data).map(|_| f)).await?;
+            let chunk = chunk?;
+            file_size += chunk.len() as i64;
+            data_buffer.write_all(chunk.as_ref()).await?;
         }
-
-        let filepath_clone = filepath.clone();
-        let file_metadata = web::block(|| std::fs::metadata(filepath_clone)).await?;
-        file_size += file_metadata.len() as i64;
-        log::debug!("Metadata for {}: {:#?}", filepath, file_metadata);
     }
     log::debug!("Uploaded {} to {}", file_size, file_dir);
 

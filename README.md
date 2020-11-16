@@ -120,7 +120,7 @@ While in the early stages of the project, this TODO list will hold the temporary
     - [ ] Data limiting: LIMIT
     - [ ] Data offset: OFFSET
 - [ ] Create routes for data load with schema enforcement
-    - [ ] To upload CSV to be cached
+    - [x] To upload CSV to be cached
     - [ ] To parse CSV that is cached
     - [ ] To stream CSV into cached table
     - [ ] To register S3 configs to download the data (via HTTP request)

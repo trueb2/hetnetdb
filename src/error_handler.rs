@@ -89,7 +89,17 @@ impl From<std::string::FromUtf8Error> for CustomError {
 
 impl From<actix_web::error::BlockingError<std::io::Error>> for CustomError {
     fn from(error: actix_web::error::BlockingError<std::io::Error>) -> CustomError {
-        log::error!("Internal server error: {:#?}", error);
+        log::error!("Internal server async IO error: {:#?}", error);
+        CustomError {
+            error_message: String::from("Internal server error"),
+            error_status_code: 501,
+        }
+    }
+}
+
+impl From<std::io::Error> for CustomError {
+    fn from(error: std::io::Error) -> CustomError {
+        log::error!("Internal server IO error: {:#?}", error);
         CustomError {
             error_message: String::from("Internal server error"),
             error_status_code: 501,
@@ -105,6 +115,7 @@ impl From<actix_web::error::Error> for CustomError {
         }
     }
 }
+
 impl
     From<
         actix_web_httpauth::extractors::AuthenticationError<
@@ -120,6 +131,15 @@ impl
         CustomError {
             error_message: String::from("Bad request"),
             error_status_code: 400,
+        }
+    }
+}
+
+impl From<actix_multipart::MultipartError> for CustomError {
+    fn from(error: actix_multipart::MultipartError) -> CustomError {
+        CustomError {
+            error_message: format!("Multipart Upload Error: {}", error),
+            error_status_code: 400
         }
     }
 }
