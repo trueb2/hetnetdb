@@ -1,5 +1,5 @@
-use super::{ATable, InsertableTable, MaybeTable};
-use crate::{AppData, error_handler::CustomError};
+use super::{TableRelation, InsertableTable, MaybeTable};
+use crate::{AppData, error_handler::CustomError, query::QueryRecord};
 use crate::table_schemas::TableSchema;
 use crate::users::User;
 use actix_multipart::Multipart;
@@ -11,7 +11,7 @@ use futures_util::AsyncWriteExt;
 async fn find_by_id(user: User, id: web::Path<i64>) -> Result<HttpResponse, CustomError> {
     let id = id.into_inner();
     log::debug!("GET /tables/id/{} (user = {})", id, user.id);
-    let table = ATable::find_by_id(user.id, id)?;
+    let table = TableRelation::find_by_id(user.id, id)?;
     Ok(HttpResponse::Ok().json(table))
 }
 
@@ -19,7 +19,7 @@ async fn find_by_id(user: User, id: web::Path<i64>) -> Result<HttpResponse, Cust
 async fn find_by_name(user: User, name: web::Path<String>) -> Result<HttpResponse, CustomError> {
     let name = name.into_inner();
     log::debug!("GET /tables/name/{} (user = {})", name, user.id);
-    let table = ATable::find_by_name(user.id, name)?;
+    let table = TableRelation::find_by_name(user.id, name)?;
     Ok(HttpResponse::Ok().json(table))
 }
 
@@ -33,12 +33,13 @@ async fn upload(
     let id = id.into_inner();
     log::debug!("POST /tables/upload/{} (user = {})", id, user.id);
 
-    let table = ATable::find_by_id(user.id, id)?;
+    let user_id = user.id;
+    let table = web::block(move || TableRelation::find_by_id(user_id, id)).await?;
     let file_dir = format!( "/tmp/tables/upload/{}/{}", user.id, sanitize_filename::sanitize(&table.name));
     let file_dir_clone = file_dir.clone();
     let _result = web::block(move || {
         log::trace!("Creating {} if not exists", file_dir_clone);
-        Ok(std::fs::create_dir_all(file_dir_clone)?)
+        std::fs::create_dir_all(file_dir_clone)
     }).await?;
 
     let mut file_size: i64 = 0;
@@ -58,8 +59,13 @@ async fn upload(
     }
     log::debug!("Uploaded {} to {}", file_size, file_dir);
 
-    // Extend the Data Cache
+    // Verify the data is valid for the selected schema
     let uploaded_data = data_buffer.into_inner();
+    let table_schema_id = table.table_schema_id;
+    let table_schema = web::block(move || TableSchema::find_by_id(table_schema_id)).await?;
+    let uploaded_records: Vec<QueryRecord>  = table_schema.verify(uploaded_data)?;
+
+    // Extend the Data Cache
     {
         let mut table_cache_map = app_data
             .table_cache
@@ -69,11 +75,10 @@ async fn upload(
             table_cache_map
                 .get_mut(&table.id)
                 .unwrap()
-                .push(uploaded_data);
+                .push(uploaded_records);
         } else {
-            table_cache_map.insert(table.id.clone(), vec![uploaded_data]);
+            table_cache_map.insert(table.id.clone(), vec![uploaded_records]);
         }
-        log::trace!("Table Cache Map: {:?}", table_cache_map);
     }
 
     // Update the table info
@@ -83,7 +88,7 @@ async fn upload(
         name: table.name,
         size: file_size,
     };
-    let table = ATable::update(user.id, id, insertable_table)?;
+    let table = web::block(move || TableRelation::update(user.id, id, insertable_table)).await?;
 
     Ok(HttpResponse::Ok().json(table))
 }
@@ -97,7 +102,7 @@ async fn update(
     let id = id.into_inner();
     let maybe_table = maybe_table.into_inner();
     log::debug!("PUT /tables/{} (user = {}) {:?}", id, user.id, maybe_table);
-    let table = ATable::update(
+    let table = TableRelation::update(
         user.id,
         id,
         InsertableTable {
@@ -127,7 +132,7 @@ async fn create(
         name: maybe_table.name,
         size: 0,
     };
-    let table = ATable::create(insertable_table)?;
+    let table = TableRelation::create(insertable_table)?;
     Ok(HttpResponse::Ok().json(table))
 }
 
@@ -135,7 +140,7 @@ async fn create(
 async fn delete(user: User, id: web::Path<i64>) -> Result<HttpResponse, CustomError> {
     let id = id.into_inner();
     log::debug!("DELETE /tables/{}", id);
-    let table = ATable::delete(user.id, id)?;
+    let table = TableRelation::delete(user.id, id)?;
     Ok(HttpResponse::Ok().json(table))
 }
 

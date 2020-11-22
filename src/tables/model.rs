@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 #[belongs_to(User)]
 #[belongs_to(TableSchema)]
 #[table_name = "tables"]
-pub struct ATable {
+pub struct TableRelation {
     pub id: i64,
     pub user_id: i64,
     pub table_schema_id: i64,
@@ -46,8 +46,8 @@ pub struct MaybeTable {
     pub name: String,
 }
 
-impl ATable {
-    pub fn find_by_id(user_id: i64, id: i64) -> Result<ATable, CustomError> {
+impl TableRelation {
+    pub fn find_by_id(user_id: i64, id: i64) -> Result<TableRelation, CustomError> {
         let conn = db::connection()?;
         let table = tables::table
             .filter(tables::id.eq(id))
@@ -56,7 +56,7 @@ impl ATable {
         Ok(table)
     }
 
-    pub fn find_by_name(user_id: i64, name: String) -> Result<ATable, CustomError> {
+    pub fn find_by_name(user_id: i64, name: String) -> Result<TableRelation, CustomError> {
         let conn = db::connection()?;
         let table = tables::table
             .filter(tables::name.eq(name))
@@ -65,7 +65,7 @@ impl ATable {
         Ok(table)
     }
 
-    pub fn create(insertable_table: InsertableTable) -> Result<ATable, CustomError> {
+    pub fn create(insertable_table: InsertableTable) -> Result<TableRelation, CustomError> {
         let conn = db::connection()?;
         let table = diesel::insert_into(tables::table)
             .values(insertable_table)
@@ -77,7 +77,7 @@ impl ATable {
         user_id: i64,
         id: i64,
         insertable_table: InsertableTable,
-    ) -> Result<ATable, CustomError> {
+    ) -> Result<TableRelation, CustomError> {
         let conn = db::connection()?;
         let table = diesel::update(tables::table)
             .filter(tables::id.eq(id))
@@ -87,7 +87,7 @@ impl ATable {
         Ok(table)
     }
 
-    pub fn delete(user_id: i64, id: i64) -> Result<ATable, CustomError> {
+    pub fn delete(user_id: i64, id: i64) -> Result<TableRelation, CustomError> {
         let conn = db::connection()?;
         let table = diesel::delete(tables::table)
             .filter(tables::id.eq(id))
@@ -97,8 +97,8 @@ impl ATable {
     }
 }
 
-impl From<ATable> for MaybeTable {
-    fn from(table: ATable) -> Self {
+impl From<TableRelation> for MaybeTable {
+    fn from(table: TableRelation) -> Self {
         MaybeTable {
             table_schema_id: table.table_schema_id,
             name: table.name,
@@ -106,8 +106,8 @@ impl From<ATable> for MaybeTable {
     }
 }
 
-impl From<ATable> for ComparableTable{
-    fn from(table: ATable) -> Self {
+impl From<TableRelation> for ComparableTable{
+    fn from(table: TableRelation) -> Self {
         ComparableTable {
             id: table.id,
             user_id: table.user_id,

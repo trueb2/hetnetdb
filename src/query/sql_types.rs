@@ -1,8 +1,9 @@
 use dyn_clone::DynClone;
 use std::{any::Any, fmt::Debug};
+use serde::{Serialize, Deserialize};
 
 #[typetag::serde]
-pub trait SqlType: DynClone + Debug {
+pub trait SqlType: DynClone + Debug + Send {
     fn name(self) -> String;
     fn value(self: &mut Self) -> Box<dyn Any>;
 }
@@ -35,6 +36,19 @@ impl SqlType for f64 {
     }
     fn value(self: &mut Self) -> Box<dyn Any> {
         Box::new(self.clone())
+    }
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+pub struct Null {}
+
+#[typetag::serde]
+impl SqlType for Null {
+    fn name(self) -> String {
+        "NULL".into()
+    }
+    fn value(self: &mut Self) -> Box<dyn Any> {
+        Box::new(Null{})
     }
 }
 

@@ -31,8 +31,9 @@ async fn find_by_id(id: web::Path<i64>) -> Result<HttpResponse, CustomError> {
 async fn create(
     maybe_table_schema: web::Json<MaybeTableSchema>,
 ) -> Result<HttpResponse, CustomError> {
-    let maybe_table_schema = maybe_table_schema.into_inner();
+    let mut maybe_table_schema = maybe_table_schema.into_inner();
     log::debug!("POST /table_schemas {:?}", maybe_table_schema);
+    maybe_table_schema.column_types = maybe_table_schema.column_types.into_iter().map(|s| s.to_lowercase()).collect();
     let table_schema = TableSchema::create(maybe_table_schema)?;
     Ok(HttpResponse::Ok().json(table_schema))
 }

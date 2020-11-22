@@ -4,7 +4,7 @@ use super::query::*;
 use super::sql_types::*;
 use crate::{AppData, users::User, error_handler::*, tables};
 use log;
-use nom_sql::SqlQuery;
+use nom_sql::{FunctionExpression, SqlQuery};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +38,30 @@ impl Execution {
             }
         };
 
+        for f in select_stmt.fields.into_iter() {
+            match f {
+                nom_sql::FieldDefinitionExpression::All => return Err(CustomError::from("Unsupported Statement")),
+                nom_sql::FieldDefinitionExpression::AllInTable(_) => return Err(CustomError::from("Unsupported Statement")),
+                nom_sql::FieldDefinitionExpression::Value(_) => return Err(CustomError::from("Unsupported Statement")),
+                nom_sql::FieldDefinitionExpression::Col(col) => {
+                    match col.function {
+                        Some(func) => {
+                            match *func {
+                                FunctionExpression::CountStar => {},
+                                FunctionExpression::Avg(_, _) => return Err(CustomError::from("Unsupported Statement")),
+                                FunctionExpression::Count(_, _) => return Err(CustomError::from("Unsupported Statement")),
+                                FunctionExpression::Sum(_, _) => return Err(CustomError::from("Unsupported Statement")),
+                                FunctionExpression::Max(_) => return Err(CustomError::from("Unsupported Statement")),
+                                FunctionExpression::Min(_) => return Err(CustomError::from("Unsupported Statement")),
+                                FunctionExpression::GroupConcat(_, _) => return Err(CustomError::from("Unsupported Statement")),
+                            }
+                        }
+                        None => return Err(CustomError::from("Unsupported Statement"))
+                    }
+                }
+            }
+        }
+
         let table_name = match select_stmt.tables.len() {
             1 => {
                 select_stmt.tables.first().unwrap().to_string().to_lowercase()
@@ -45,28 +69,21 @@ impl Execution {
             _ => return Err(CustomError::from("Unsupported number of tables"))
         };
 
-        let table = tables::ATable::find_by_name(user.id, table_name)?;
+        let table = tables::TableRelation::find_by_name(user.id, table_name)?;
         log::debug!("Sourcing data from {:?}", table);
 
         let table_cache_map = app_data
             .table_cache
             .lock()
             .await;
-        log::trace!("Table Cache Map: {:?}", table_cache_map);
 
         let mut count = 0 as i64;
         if let Some(table_data) = table_cache_map.get(&table.id) {
-            log::trace!("Found table_data: {:?}", table_data);
-            for ref table_partition in table_data.into_iter() {
-                let mut reader = csv::ReaderBuilder::new()
-                    .has_headers(false)
-                    .from_reader(table_partition.as_slice());
-                for result in reader.deserialize() {
-                    // Notice that we need to provide a type hint for automatic
-                    // deserialization.
-                    let _record: LineRecord = result?;
-                    count += 1;
-                }
+            log::trace!("Found table_data with {} partitions", table_data.len());
+            for table_partition in table_data.into_iter() {
+                let length = table_partition.len();
+                log::trace!("Adding table_data partition of length {}", length);
+                count += length as i64;
             }
         } else {
             log::warn!("No data found for table {:?}", table);

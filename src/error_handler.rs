@@ -97,6 +97,16 @@ impl From<actix_web::error::BlockingError<std::io::Error>> for CustomError {
     }
 }
 
+impl From<actix_web::error::BlockingError<CustomError>> for CustomError {
+    fn from(error: actix_web::error::BlockingError<CustomError>) -> CustomError {
+        log::error!("Internal server async IO error: {:#?}", error);
+        CustomError {
+            error_message: String::from("Internal server error"),
+            error_status_code: 501,
+        }
+    }
+}
+
 impl From<std::io::Error> for CustomError {
     fn from(error: std::io::Error) -> CustomError {
         log::error!("Internal server IO error: {:#?}", error);
@@ -111,6 +121,24 @@ impl From<actix_web::error::Error> for CustomError {
     fn from(_error: actix_web::error::Error) -> CustomError {
         CustomError {
             error_message: String::from("Bad request"),
+            error_status_code: 400,
+        }
+    }
+}
+
+impl From<std::num::ParseIntError> for CustomError {
+    fn from(_error: std::num::ParseIntError) -> CustomError {
+        CustomError {
+            error_message: String::from("Bad request. ParseIntError"),
+            error_status_code: 400,
+        }
+    }
+}
+
+impl From<std::num::ParseFloatError> for CustomError {
+    fn from(_error: std::num::ParseFloatError) -> CustomError {
+        CustomError {
+            error_message: String::from("Bad request. ParseFloatError"),
             error_status_code: 400,
         }
     }

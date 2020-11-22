@@ -1,6 +1,7 @@
 use crate::db;
 use crate::error_handler::*;
 use crate::schema::table_schemas;
+use crate::query::{QueryRecord, QueryRecordBuilder};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,19 @@ impl TableSchema {
             .get_result(&conn)?;
         Ok(table_schema)
     }
+
+    pub fn verify(self: &Self, raw_data: Vec<u8>) -> Result<Vec<QueryRecord>, CustomError> {
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(raw_data.as_slice());
+        let query_record_builder = QueryRecordBuilder::new(self);
+        let records: Result<Vec<_>, _> = reader.deserialize()
+            .map(|raw_record| query_record_builder.from_vec(raw_record?))
+            .collect();
+        let records = records?;
+        log::debug!("Verified {} rows for {:?}", records.len(), &self);
+        Ok(records)
+    }
 }
 
 impl From<TableSchema> for MaybeTableSchema {
@@ -61,3 +75,4 @@ impl From<TableSchema> for MaybeTableSchema {
         }
     }
 }
+

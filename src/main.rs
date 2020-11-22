@@ -27,7 +27,7 @@ mod tables;
 mod users;
 
 pub struct AppData {
-    pub table_cache: Mutex<HashMap<i64, Vec<Vec<u8>>>>
+    pub table_cache: Mutex<HashMap<i64, Vec<Vec<query::QueryRecord>>>>
 }
 
 macro_rules! AppFactory {
@@ -371,7 +371,7 @@ mod tests {
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload.clone())
             .to_request();
-        let resp: tables::ATable = test::read_response_json(&mut app, req).await;
+        let resp: tables::TableRelation = test::read_response_json(&mut app, req).await;
         assert_eq!(maybe_table, tables::MaybeTable::from(resp.clone()));
 
         let maybe_table = tables::MaybeTable {
@@ -389,7 +389,7 @@ mod tests {
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload.clone())
             .to_request();
-        let resp: tables::ATable = test::read_response_json(&mut app, req).await;
+        let resp: tables::TableRelation = test::read_response_json(&mut app, req).await;
         assert_eq!(maybe_table, tables::MaybeTable::from(resp.clone()));
 
         let req = test::TestRequest::delete()
@@ -400,7 +400,7 @@ mod tests {
             )
             .header(header::CONTENT_TYPE, "application/json")
             .to_request();
-        let resp: tables::ATable = test::read_response_json(&mut app, req).await;
+        let resp: tables::TableRelation = test::read_response_json(&mut app, req).await;
         assert_eq!(maybe_table, tables::MaybeTable::from(resp));
     }
 
@@ -464,7 +464,7 @@ mod tests {
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload.clone())
             .to_request();
-        let table: tables::ATable = test::read_response_json(&mut app, req).await;
+        let table: tables::TableRelation = test::read_response_json(&mut app, req).await;
         assert_eq!(maybe_table, tables::MaybeTable::from(table.clone()));
 
         let req = test::TestRequest::post()
@@ -476,7 +476,7 @@ mod tests {
             .header(header::CONTENT_TYPE, content_type)
             .set_payload(multipart_payload)
             .to_request();
-        let table_after_upload: tables::ATable = test::read_response_json(&mut app, req).await;
+        let table_after_upload: tables::TableRelation = test::read_response_json(&mut app, req).await;
         let mut expected_table = table.clone();
         expected_table.size = 21;
         assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));
@@ -542,7 +542,7 @@ mod tests {
             .header(header::CONTENT_TYPE, "application/json")
             .set_payload(payload.clone())
             .to_request();
-        let table: tables::ATable = test::read_response_json(&mut app, req).await;
+        let table: tables::TableRelation = test::read_response_json(&mut app, req).await;
         assert_eq!(maybe_table, tables::MaybeTable::from(table.clone()));
 
         let req = test::TestRequest::post()
@@ -554,7 +554,7 @@ mod tests {
             .header(header::CONTENT_TYPE, content_type)
             .set_payload(multipart_payload)
             .to_request();
-        let table_after_upload: tables::ATable = test::read_response_json(&mut app, req).await;
+        let table_after_upload: tables::TableRelation = test::read_response_json(&mut app, req).await;
         let mut expected_table = table.clone();
         expected_table.size = 21;
         assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));        let req = test::TestRequest::post()
