@@ -1,0 +1,20 @@
+---
+
+concurrency: 4
+base: 'http://localhost:6969'
+iterations: 1000
+rampup: 2
+
+plan:
+  - name: Run queries 
+    request:
+      method: POST
+      url: /query/submit
+      body: '{{ item.text }}'
+      headers:
+        Content-Type: 'application/json'
+        Authorization: 'Bearer NZvsMhczdgmOV00pGYNldWVu9nhhu2tiSgoxfeV/iPY/xq391iVyufvkrndiR433'
+    with_items_from_csv:
+      file_name: queries.txt
+      quote_char: "|"
+
