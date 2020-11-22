@@ -118,7 +118,8 @@ impl From<std::io::Error> for CustomError {
 }
 
 impl From<actix_web::error::Error> for CustomError {
-    fn from(_error: actix_web::error::Error) -> CustomError {
+    fn from(error: actix_web::error::Error) -> CustomError {
+        log::debug!("Encountered {:?}", error);
         CustomError {
             error_message: String::from("Bad request"),
             error_status_code: 400,
@@ -127,7 +128,8 @@ impl From<actix_web::error::Error> for CustomError {
 }
 
 impl From<std::num::ParseIntError> for CustomError {
-    fn from(_error: std::num::ParseIntError) -> CustomError {
+    fn from(error: std::num::ParseIntError) -> CustomError {
+        log::trace!("Encountered ParseIntError: {:?}", error);
         CustomError {
             error_message: String::from("Bad request. ParseIntError"),
             error_status_code: 400,
@@ -136,7 +138,8 @@ impl From<std::num::ParseIntError> for CustomError {
 }
 
 impl From<std::num::ParseFloatError> for CustomError {
-    fn from(_error: std::num::ParseFloatError) -> CustomError {
+    fn from(error: std::num::ParseFloatError) -> CustomError {
+        log::trace!("Encountered ParseFloatError: {:?}", error);
         CustomError {
             error_message: String::from("Bad request. ParseFloatError"),
             error_status_code: 400,
@@ -156,8 +159,9 @@ impl
             actix_web_httpauth::headers::www_authenticate::bearer::Bearer,
         >,
     ) -> CustomError {
+
         CustomError {
-            error_message: String::from("Bad request"),
+            error_message: String::from("Not authenticated"),
             error_status_code: 400,
         }
     }
@@ -165,6 +169,7 @@ impl
 
 impl From<actix_multipart::MultipartError> for CustomError {
     fn from(error: actix_multipart::MultipartError) -> CustomError {
+        log::trace!("Encountered MultipartError: {:?}", error);
         CustomError {
             error_message: format!("Multipart Upload Error: {}", error),
             error_status_code: 400
@@ -184,6 +189,7 @@ impl From<csv::Error> for CustomError {
 
 impl From<&str> for CustomError {
     fn from(error: &str) -> CustomError {
+        log::trace!("Creating error: {}", error);
         CustomError {
             error_message: format!("Bad request: {}", error),
             error_status_code: 400,
