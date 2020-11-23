@@ -121,7 +121,7 @@ While in the early stages of the project, this TODO list will hold the temporary
     - [ ] Data offset: OFFSET
 - [ ] Create routes for data load with schema enforcement
     - [x] To upload CSV to be cached
-    - [ ] To parse CSV that is cached
+    - [x] To parse CSV that is cached
     - [ ] To stream CSV into cached table
     - [ ] To register S3 configs to download the data (via HTTP request)
     - [ ] To register agent configs to process data locally (requires agency CLI/daemon services)
