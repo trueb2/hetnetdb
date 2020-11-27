@@ -106,7 +106,7 @@ impl From<TableRelation> for MaybeTable {
     }
 }
 
-impl From<TableRelation> for ComparableTable{
+impl From<TableRelation> for ComparableTable {
     fn from(table: TableRelation) -> Self {
         ComparableTable {
             id: table.id,

@@ -32,8 +32,4 @@ table! {
 joinable!(tables -> table_schemas (table_schema_id));
 joinable!(tables -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(
-    table_schemas,
-    tables,
-    users,
-);
+allow_tables_to_appear_in_same_query!(table_schemas, tables, users,);

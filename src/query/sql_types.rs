@@ -1,6 +1,6 @@
 use dyn_clone::DynClone;
+use serde::{Deserialize, Serialize};
 use std::{any::Any, fmt::Debug};
-use serde::{Serialize, Deserialize};
 
 #[typetag::serde]
 pub trait SqlType: DynClone + Debug + Send {
@@ -48,7 +48,7 @@ impl SqlType for Null {
         "NULL".into()
     }
     fn value(self: &mut Self) -> Box<dyn Any> {
-        Box::new(Null{})
+        Box::new(Null {})
     }
 }
 

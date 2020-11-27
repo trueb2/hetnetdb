@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use nom_sql::parser::parse_query;
 use nom_sql::SqlQuery;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Query {
@@ -60,7 +60,7 @@ impl Query {
 }
 
 pub struct QueryRecordBuilder {
-    into_types: Vec<Box<dyn Fn(String) -> Result<Box<dyn SqlType>, CustomError>>>
+    into_types: Vec<Box<dyn Fn(String) -> Result<Box<dyn SqlType>, CustomError>>>,
 }
 
 impl QueryRecordBuilder {
@@ -69,29 +69,31 @@ impl QueryRecordBuilder {
             .into_iter()
             .map(|type_string| {
                 let into_type: Box<dyn Fn(String) -> Result<Box<dyn SqlType>, CustomError>> =
-                match type_string.as_str() {
-                    "i64" => Box::new(|s: String| Ok(Box::new(s.parse::<i64>()?))),
-                    "f64" => Box::new(|s: String| Ok(Box::new(s.parse::<f64>()?))),
-                    "string" => Box::new(|s: String| Ok(Box::new(s))),
-                    _ => Box::new(|_s| Ok(Box::new(Null::default()))),
-                };
+                    match type_string.as_str() {
+                        "i64" => Box::new(|s: String| Ok(Box::new(s.parse::<i64>()?))),
+                        "f64" => Box::new(|s: String| Ok(Box::new(s.parse::<f64>()?))),
+                        "string" => Box::new(|s: String| Ok(Box::new(s))),
+                        _ => Box::new(|_s| Ok(Box::new(Null::default()))),
+                    };
                 into_type
             })
             .collect();
 
         QueryRecordBuilder {
-            into_types: into_types
+            into_types: into_types,
         }
     }
 
     pub fn from_vec(self: &Self, columns: Vec<String>) -> Result<QueryRecord, CustomError> {
-        let mut record = QueryRecord { ..Default::default() };
+        let mut record = QueryRecord {
+            ..Default::default()
+        };
         let columns: Result<Vec<Box<dyn SqlType>>, _> = (&self.into_types)
             .into_iter()
             .zip(columns.into_iter())
             .map(|item| item.0(item.1))
             .collect();
-         record.columns = columns?;
+        record.columns = columns?;
         record.ready = RecordTime::default();
         Ok(record)
     }
@@ -143,4 +145,3 @@ mod tests {
         assert_eq!(query.parse, query.optimal_parse);
     }
 }
-

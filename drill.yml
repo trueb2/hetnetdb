@@ -6,7 +6,7 @@ iterations: 1000
 rampup: 2
 
 plan:
-  - name: Run queries 
+  - name: Run queries
     request:
       method: POST
       url: /query/submit

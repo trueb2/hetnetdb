@@ -23,6 +23,14 @@ Before defining terms, let's define a teir list: Good(TG), Bad(TB), and Ugly(TU)
 * Execution Nodes: These are the high level todo list for the query. The Query Server keeps track of agents and delegates nodes to agents as it traverses the execution graph
 * Execution Graph: The execution graph is the parsed plan for executing Execution Nodes. Every query has one graph pending finalization as error or results.
 
+### Execution Graph Traits and Structs
+
+The `GraphBuilder` struct exists to expose the builder pattern to create, validate, and optimize an execution graph in concise syntax. `GraphBuilder::new(query_id)` begins constructing an execution graph for a persisted query by `query_id` such that distributed requests during execution can render a new execution graph, searching by `query_id`. On `GraphBuilder::build(&mut self)-> RootNode`, the graph is optimized and ready to query (or continue querying).
+
+The execution graph itself has a `RootNode` intended to act as a metadata, pass-through node that supports the same async `Node` interface as the rest of the `HyperNode`s in the graph. Each `HyperNode` is an Execution Node in the execution graph with direct ties to [relational algebra](https://en.wikipedia.org/wiki/Relational_algebra). Like `RootNode`, `HyperNode` exposes an `async fn curse() -> Arc<WorkNodeCursor>` interface for traversing result sets yielded by the asynchronous processing interface of a `WorkNodeCursor`. A `HyperNode` is a meta node that does not actually do compute or read; it initializes and yields to the compute and read done at the `WorkNode` instances. `WorkNode` instances are intended to be flexibly deployed and partitioned, they implement the logic to support the various `OpType`s or `IoType`s.
+
+Discussed and motivated in the following Topologies section, a `HyperNode` may run in an Executor on one Agent and expose an asynchronous cursor to `WorkNode`s running on Executors on a different Agent.
+
 
 ## Topologies
 
@@ -104,6 +112,7 @@ While in the early stages of the project, this TODO list will hold the temporary
     - [x] To execute an optimized SQL query
     - [x] To submit an unchecked SQL query and wait for results
 - [ ] Inflate an optimized query into an execution graph
+    - [x] Define base graph types and relationships
 - [ ] Create execution nodes for data _
     - [ ] Data filtering: WHERE
     - [ ] Data grouping: GROUP BY

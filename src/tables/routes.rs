@@ -1,7 +1,7 @@
-use super::{TableRelation, InsertableTable, MaybeTable};
-use crate::{AppData, error_handler::CustomError, query::QueryRecord};
+use super::{InsertableTable, MaybeTable, TableRelation};
 use crate::table_schemas::TableSchema;
 use crate::users::User;
+use crate::{error_handler::CustomError, query::QueryRecord, AppData};
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use futures::{io::Cursor, StreamExt, TryStreamExt};
@@ -35,12 +35,17 @@ async fn upload(
 
     let user_id = user.id;
     let table = web::block(move || TableRelation::find_by_id(user_id, id)).await?;
-    let file_dir = format!( "/tmp/tables/upload/{}/{}", user.id, sanitize_filename::sanitize(&table.name));
+    let file_dir = format!(
+        "/tmp/tables/upload/{}/{}",
+        user.id,
+        sanitize_filename::sanitize(&table.name)
+    );
     let file_dir_clone = file_dir.clone();
     let _result = web::block(move || {
         log::trace!("Creating {} if not exists", file_dir_clone);
         std::fs::create_dir_all(file_dir_clone)
-    }).await?;
+    })
+    .await?;
 
     let mut file_size: i64 = 0;
     let mut data_buffer = Cursor::new(Vec::with_capacity(1024));
@@ -63,14 +68,11 @@ async fn upload(
     let uploaded_data = data_buffer.into_inner();
     let table_schema_id = table.table_schema_id;
     let table_schema = web::block(move || TableSchema::find_by_id(table_schema_id)).await?;
-    let uploaded_records: Vec<QueryRecord>  = table_schema.verify(uploaded_data)?;
+    let uploaded_records: Vec<QueryRecord> = table_schema.verify(uploaded_data)?;
 
     // Extend the Data Cache
     {
-        let mut table_cache_map = app_data
-            .table_cache
-            .lock()
-            .await;
+        let mut table_cache_map = app_data.table_cache.lock().await;
         if table_cache_map.contains_key(&table.id) {
             table_cache_map
                 .get_mut(&table.id)

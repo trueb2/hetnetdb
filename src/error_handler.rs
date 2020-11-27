@@ -159,7 +159,6 @@ impl
             actix_web_httpauth::headers::www_authenticate::bearer::Bearer,
         >,
     ) -> CustomError {
-
         CustomError {
             error_message: String::from("Not authenticated"),
             error_status_code: 400,
@@ -172,7 +171,7 @@ impl From<actix_multipart::MultipartError> for CustomError {
         log::trace!("Encountered MultipartError: {:?}", error);
         CustomError {
             error_message: format!("Multipart Upload Error: {}", error),
-            error_status_code: 400
+            error_status_code: 400,
         }
     }
 }
@@ -182,7 +181,7 @@ impl From<csv::Error> for CustomError {
         log::warn!("Csv Error: {:?}", error);
         CustomError {
             error_message: format!("Csv Error: {}", error),
-            error_status_code: 400
+            error_status_code: 400,
         }
     }
 }
@@ -190,6 +189,16 @@ impl From<csv::Error> for CustomError {
 impl From<&str> for CustomError {
     fn from(error: &str) -> CustomError {
         log::trace!("Creating error: {}", error);
+        CustomError {
+            error_message: format!("Bad request: {}", error),
+            error_status_code: 400,
+        }
+    }
+}
+
+impl From<serde_urlencoded::ser::Error> for CustomError {
+    fn from(error: serde_urlencoded::ser::Error) -> CustomError {
+        log::trace!("Bad query parameters: {}", error);
         CustomError {
             error_message: format!("Bad request: {}", error),
             error_status_code: 400,

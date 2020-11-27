@@ -20,6 +20,7 @@ mod db;
 mod error_handler;
 mod schema;
 
+mod graph;
 mod health;
 mod query;
 mod table_schemas;
@@ -27,7 +28,7 @@ mod tables;
 mod users;
 
 pub struct AppData {
-    pub table_cache: Mutex<HashMap<i64, Vec<Vec<query::QueryRecord>>>>
+    pub table_cache: Mutex<HashMap<i64, Vec<Vec<query::QueryRecord>>>>,
 }
 
 macro_rules! AppFactory {
@@ -54,6 +55,7 @@ macro_rules! AppFactory {
                 .configure(users::init_routes)
                 .configure(tables::init_routes)
                 .configure(table_schemas::init_routes)
+                .configure(graph::init_routes)
         }
     };
 }
@@ -70,8 +72,7 @@ async fn main() -> std::io::Result<()> {
     let app_data = web::Data::new(AppData {
         table_cache: Mutex::new(HashMap::new()),
     });
-    let mut server = 
-        HttpServer::new(AppFactory!(app_data.clone()));
+    let mut server = HttpServer::new(AppFactory!(app_data.clone()));
 
     server = match listenfd.take_tcp_listener(0)? {
         Some(listener) => server.listen(listener)?,
@@ -88,7 +89,7 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{App, web::Bytes, http::StatusCode, test};
+    use actix_web::{http::StatusCode, test, web::Bytes, App};
     use lazy_static::lazy_static;
     use std::convert::TryInto;
 
@@ -412,7 +413,8 @@ mod tests {
 
         // We are going to upload this data
         let content_type = "multipart/form-data; boundary=0150c250cceb4434b3ea2f7ed7e87dfc";
-        let multipart_payload = Bytes::from("\r\n\
+        let multipart_payload = Bytes::from(
+            "\r\n\
              --0150c250cceb4434b3ea2f7ed7e87dfc\r\n\
              Content-Disposition: form-data; name=\"csv\"; filename=\"sequence.csv\"\r\n\
              Content-Type: text/csv\r\n\r\n\
@@ -426,14 +428,11 @@ mod tests {
              8\n\
              9\n\
              10\n\
-             \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n");
-
+             \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n",
+        );
 
         let table_schema = table_schemas::MaybeTableSchema {
-            column_types: ["i64"]
-                .iter()
-                .map(|s| String::from(*s))
-                .collect(),
+            column_types: ["i64"].iter().map(|s| String::from(*s)).collect(),
         };
         let payload = serde_json::to_string(&table_schema).expect("Invalid value");
 
@@ -476,10 +475,14 @@ mod tests {
             .header(header::CONTENT_TYPE, content_type)
             .set_payload(multipart_payload)
             .to_request();
-        let table_after_upload: tables::TableRelation = test::read_response_json(&mut app, req).await;
+        let table_after_upload: tables::TableRelation =
+            test::read_response_json(&mut app, req).await;
         let mut expected_table = table.clone();
         expected_table.size = 21;
-        assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));
+        assert_eq!(
+            tables::ComparableTable::from(table_after_upload),
+            tables::ComparableTable::from(expected_table)
+        );
     }
 
     #[actix_rt::test]
@@ -490,7 +493,8 @@ mod tests {
 
         // We are going to upload this data
         let content_type = "multipart/form-data; boundary=0150c250cceb4434b3ea2f7ed7e87dfc";
-        let multipart_payload = Bytes::from("\r\n\
+        let multipart_payload = Bytes::from(
+            "\r\n\
              --0150c250cceb4434b3ea2f7ed7e87dfc\r\n\
              Content-Disposition: form-data; name=\"csv\"; filename=\"sequence.csv\"\r\n\
              Content-Type: text/csv\r\n\r\n\
@@ -504,14 +508,11 @@ mod tests {
              8\n\
              9\n\
              10\n\
-             \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n");
-
+             \r\n--0150c250cceb4434b3ea2f7ed7e87dfc--\r\n",
+        );
 
         let table_schema = table_schemas::MaybeTableSchema {
-            column_types: ["i64"]
-                .iter()
-                .map(|s| String::from(*s))
-                .collect(),
+            column_types: ["i64"].iter().map(|s| String::from(*s)).collect(),
         };
         let payload = serde_json::to_string(&table_schema).expect("Invalid value");
 
@@ -554,10 +555,15 @@ mod tests {
             .header(header::CONTENT_TYPE, content_type)
             .set_payload(multipart_payload)
             .to_request();
-        let table_after_upload: tables::TableRelation = test::read_response_json(&mut app, req).await;
+        let table_after_upload: tables::TableRelation =
+            test::read_response_json(&mut app, req).await;
         let mut expected_table = table.clone();
         expected_table.size = 21;
-        assert_eq!(tables::ComparableTable::from(table_after_upload), tables::ComparableTable::from(expected_table));        let req = test::TestRequest::post()
+        assert_eq!(
+            tables::ComparableTable::from(table_after_upload),
+            tables::ComparableTable::from(expected_table)
+        );
+        let req = test::TestRequest::post()
             .uri("/query/submit")
             .header(
                 header::AUTHORIZATION,

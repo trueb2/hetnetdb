@@ -1,7 +1,7 @@
 use crate::db;
 use crate::error_handler::*;
-use crate::schema::table_schemas;
 use crate::query::{QueryRecord, QueryRecordBuilder};
+use crate::schema::table_schemas;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -59,7 +59,8 @@ impl TableSchema {
             .has_headers(false)
             .from_reader(raw_data.as_slice());
         let query_record_builder = QueryRecordBuilder::new(self);
-        let records: Result<Vec<_>, _> = reader.deserialize()
+        let records: Result<Vec<_>, _> = reader
+            .deserialize()
             .map(|raw_record| query_record_builder.from_vec(raw_record?))
             .collect();
         let records = records?;
@@ -75,4 +76,3 @@ impl From<TableSchema> for MaybeTableSchema {
         }
     }
 }
-

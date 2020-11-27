@@ -33,7 +33,11 @@ async fn create(
 ) -> Result<HttpResponse, CustomError> {
     let mut maybe_table_schema = maybe_table_schema.into_inner();
     log::debug!("POST /table_schemas {:?}", maybe_table_schema);
-    maybe_table_schema.column_types = maybe_table_schema.column_types.into_iter().map(|s| s.to_lowercase()).collect();
+    maybe_table_schema.column_types = maybe_table_schema
+        .column_types
+        .into_iter()
+        .map(|s| s.to_lowercase())
+        .collect();
     let table_schema = TableSchema::create(maybe_table_schema)?;
     Ok(HttpResponse::Ok().json(table_schema))
 }
