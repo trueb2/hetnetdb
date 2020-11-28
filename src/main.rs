@@ -1,3 +1,6 @@
+#![feature(get_mut_unchecked)]
+
+
 #[macro_use]
 extern crate diesel;
 #[macro_use]
