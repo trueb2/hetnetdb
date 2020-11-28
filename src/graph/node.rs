@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+use async_trait::async_trait;
 use crate::query::SqlType;
 use futures::{io::Cursor, AsyncBufRead, AsyncRead, AsyncSeek};
 use std::{fmt::Debug, sync::Arc};
@@ -50,7 +51,7 @@ pub enum AggOpType {
 
 #[derive(Debug, Clone)]
 pub enum IoType {
-    Ram,
+    Ram(String),
     Disk,
     Network,
     Generator,
@@ -68,13 +69,6 @@ pub enum NodeInput {
     Single(Arc<HyperNode>),
     Double(Arc<HyperNode>, Arc<HyperNode>),
     Leaf,
-}
-
-#[derive(Debug, Clone)]
-pub enum NodeOutput {
-    None,
-    Single(Arc<HyperNode>),
-    Root,
 }
 
 #[derive(Clone, Debug)]
@@ -124,18 +118,16 @@ impl AsyncSeek for WorkNodeCursor {
     }
 }
 
+#[async_trait]
 pub trait Node {
     fn input(&self) -> NodeInput;
-    fn output(&self) -> NodeOutput;
     fn personality(&self) -> NodeType;
-
-    fn curse(&self) -> Arc<WorkNodeCursor>;
+    async fn curse(&self) -> Arc<WorkNodeCursor>;
 }
 
 #[derive(Debug)]
 struct NodeInfo {
     input: NodeInput,
-    output: NodeOutput,
     personality: NodeType,
 }
 
@@ -174,20 +166,17 @@ impl HyperNode {
     }
 }
 
+#[async_trait]
 impl Node for HyperNode {
     fn input(&self) -> NodeInput {
         self.info.input.clone()
-    }
-
-    fn output(&self) -> NodeOutput {
-        self.info.output.clone()
     }
 
     fn personality(&self) -> NodeType {
         self.info.personality.clone()
     }
 
-    fn curse(&self) -> Arc<WorkNodeCursor> {
+    async fn curse(&self) -> Arc<WorkNodeCursor> {
         let work_nodes = vec![];
         Arc::new(WorkNodeCursor::new(work_nodes))
     }
@@ -202,18 +191,12 @@ impl RootNode {
     }
 }
 
+#[async_trait]
 impl Node for RootNode {
     fn input(&self) -> NodeInput {
         match self.graph {
             Some(ref root) => root.input(),
             None => NodeInput::None,
-        }
-    }
-
-    fn output(&self) -> NodeOutput {
-        match self.graph {
-            Some(ref root) => root.output(),
-            None => NodeOutput::None,
         }
     }
 
@@ -224,7 +207,7 @@ impl Node for RootNode {
         }
     }
 
-    fn curse(&self) -> Arc<WorkNodeCursor> {
+    async fn curse(&self) -> Arc<WorkNodeCursor> {
         todo!()
     }
 }
@@ -264,43 +247,34 @@ impl GraphBuilder {
     ) -> &mut Self {
 
         // First: setup where the data comes from
-        let mut select_node = Arc::new(HyperNode::new(
+        let select_node = Arc::new(HyperNode::new(
             format!("select_{}", input_relation),
             None,
             NodeInfo {
                 input: NodeInput::Leaf,
-                output: NodeOutput::Root,
-                personality: NodeType::Leaf(IoType::Ram),
+                personality: NodeType::Leaf(IoType::Ram(input_relation.to_lowercase())),
             },
         ));
 
         // Second: Project out the data that we want to use
-        let mut project_node = Arc::new( HyperNode::new(
+        let project_node = Arc::new( HyperNode::new(
             String::from("project"),
             project_columns.clone(),
             NodeInfo {
-                input: NodeInput::Single(select_node.clone()),
-                output: NodeOutput::Root,
+                input: NodeInput::Single(select_node),
                 personality: NodeType::Op(OpType::Project),
             }
         ));
-        let select_node = unsafe { Arc::get_mut_unchecked(&mut select_node) };
-        let select_node_info =  unsafe { Arc::get_mut_unchecked(&mut select_node.info) };
-        select_node_info.output = NodeOutput::Single(project_node.clone());
 
         // Third: Reorder the data that we want output by the subselect
         let reorder_node = Arc::new( HyperNode::new(
             String::from("reorder"),
             project_columns,
             NodeInfo {
-                input: NodeInput::Single(project_node.clone()),
-                output: NodeOutput::Root,
+                input: NodeInput::Single(project_node),
                 personality: NodeType::Op(OpType::Reorder),
             }
         ));
-        let project_node = unsafe { Arc::get_mut_unchecked(&mut project_node) };
-        let project_node_info =  unsafe { Arc::get_mut_unchecked(&mut project_node.info) };
-        project_node_info.output = NodeOutput::Single(reorder_node.clone());
 
         // TODO: Nested subselects and joins as recursive nodes in execution graph
         // Hook up the root to the reorder
