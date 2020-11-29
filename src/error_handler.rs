@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::fmt;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CustomError {
     pub error_status_code: u16,
     pub error_message: String,

@@ -8,6 +8,7 @@ use std::fmt::Debug;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Query {
+    pub id: Option<i64>,
     pub text: String,
     pub parse: Option<SqlQuery>,
     pub optimal_parse: Option<SqlQuery>,

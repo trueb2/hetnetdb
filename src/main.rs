@@ -1,5 +1,5 @@
 #![feature(get_mut_unchecked)]
-
+#![feature(async_closure)]
 
 #[macro_use]
 extern crate diesel;

@@ -1,10 +1,13 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use super::query::*;
-use super::sql_types::*;
-use crate::{error_handler::*, tables, users::User, AppData};
+use crate::{error_handler::*, users::User, AppData, graph};
+// use futures::channel::mpsc::{ channel};
+use futures_util::StreamExt;
+use futures_util::future;
+use futures_util::task::Poll;
+use graph::ExecuteContext;
 use log;
-use nom_sql::{FunctionExpression, SqlQuery};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -26,97 +29,61 @@ impl Execution {
             &query.optimal_parse
         );
 
+        // Verify we have a query to execute
         let sql_query = match query.optimal_parse {
             Some(sql_query) => sql_query,
             None => return Err(CustomError::from("Bad Request. Incomplete query.")),
         };
 
-        let select_stmt = match sql_query {
-            SqlQuery::Select(select_stmt) => {
-                log::trace!("Found SelectStatement: {:#?}", &select_stmt);
-                select_stmt
-            }
-            _ => {
-                log::debug!("Unsupported, valid SqlQuery: {:#?}", sql_query);
-                return Err(CustomError::from("Unsupported Statement"));
-            }
-        };
+        // Initialize an execution graph
+        let query_id = query.id.unwrap_or_default();
+        let root: Arc<dyn graph::Node> = graph::GraphInflator::new()
+            .inflate(query_id, sql_query)
+            .await?;
 
-        for f in select_stmt.fields.into_iter() {
-            match f {
-                nom_sql::FieldDefinitionExpression::All => {
-                    return Err(CustomError::from("Unsupported Statement"))
+        // Create a channel to receive rows processed by the execution graph
+        let channel_buf_size = (1 as usize) << 20;
+        let (sender, receiver) = futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
+        let ctx = Arc::new(ExecuteContext { user_id: user.id, app_data });
+        root.curse(ctx, sender).await?;
+
+        // Collect all of the records emitted to the channel
+        let error = RwLock::new(None);
+        let records = receiver
+            .map(|r| {
+                match r {
+                    Ok(_) => (),
+                    Err(ref err) => {
+                        let mut error = error.write().unwrap();
+                        *error = Some(err.clone());
+                    }
                 }
-                nom_sql::FieldDefinitionExpression::AllInTable(_) => {
-                    return Err(CustomError::from("Unsupported Statement"))
+                r
+            })
+            .take_until(future::poll_fn(|_ctx| {
+                let error = error.read().unwrap();
+                return match &*error {
+                    Some(_) => Poll::Ready(()),
+                    None => Poll::Pending,
                 }
-                nom_sql::FieldDefinitionExpression::Value(_) => {
-                    return Err(CustomError::from("Unsupported Statement"))
-                }
-                nom_sql::FieldDefinitionExpression::Col(col) => match col.function {
-                    Some(func) => match *func {
-                        FunctionExpression::CountStar => {}
-                        FunctionExpression::Avg(_, _) => {
-                            return Err(CustomError::from("Unsupported Statement"))
-                        }
-                        FunctionExpression::Count(_, _) => {
-                            return Err(CustomError::from("Unsupported Statement"))
-                        }
-                        FunctionExpression::Sum(_, _) => {
-                            return Err(CustomError::from("Unsupported Statement"))
-                        }
-                        FunctionExpression::Max(_) => {
-                            return Err(CustomError::from("Unsupported Statement"))
-                        }
-                        FunctionExpression::Min(_) => {
-                            return Err(CustomError::from("Unsupported Statement"))
-                        }
-                        FunctionExpression::GroupConcat(_, _) => {
-                            return Err(CustomError::from("Unsupported Statement"))
-                        }
-                    },
-                    None => return Err(CustomError::from("Unsupported Statement")),
-                },
+            }))
+            .map(Result::ok)
+            .map(Option::unwrap)
+            .collect::<Vec<QueryRecord>>()
+            .await;
+
+        // Report errors
+        match error.into_inner().unwrap() { // We die
+            Some(err) => Err(err.clone()),
+            None => {
+                // Package up the results and return
+                let query_result = QueryResult {
+                    records,
+                    ..Default::default()
+                };
+                log::info!("Query {} produced {} records", query_id, query_result.records.len());
+                Ok(query_result)
             }
         }
-
-        let table_name = match select_stmt.tables.len() {
-            1 => select_stmt
-                .tables
-                .first()
-                .unwrap()
-                .to_string()
-                .to_lowercase(),
-            _ => return Err(CustomError::from("Unsupported number of tables")),
-        };
-
-        let table = tables::TableRelation::find_by_name(user.id, table_name)?;
-        log::debug!("Sourcing data from {:?}", table);
-
-        let table_cache_map = app_data.table_cache.lock().await;
-
-        let mut count = 0 as i64;
-        if let Some(table_data) = table_cache_map.get(&table.id) {
-            log::trace!("Found table_data with {} partitions", table_data.len());
-            for table_partition in table_data.into_iter() {
-                let length = table_partition.len();
-                log::trace!("Adding table_data partition of length {}", length);
-                count += length as i64;
-            }
-        } else {
-            log::warn!("No data found for table {:?}", table);
-        }
-
-        Ok(QueryResult {
-            records: [QueryRecord {
-                columns: [count as i64]
-                    .iter()
-                    .map(|v| Box::new(*v) as Box<dyn SqlType>)
-                    .collect(),
-                ..Default::default()
-            }]
-            .to_vec(),
-            ..Default::default()
-        })
     }
 }
