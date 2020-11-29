@@ -1,8 +1,18 @@
 [package]
 name = "hetnetdb"
 version = "0.1.1"
-authors = ["Jacob Trueb <jtrueb@northwestern.edu>"]
+authors = ["Jacob Trueb <trueb2@illinois.edu>"]
 edition = "2018"
+readme = "README.md"
+license = "GNU GPLv3"
+homepage = "https://github.com/trueb2/hetnetdb"
+repository = "https://github.com/trueb2/hetnetdb"
+keywords = ["heterogenous", "actix", "sql", "distributed"]
+categories = ["command-line-utilities", "database-implementations", "parsing"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -1,9 +1,30 @@
 [![Actions Status](https://github.com/trueb2/hetnetdb/workflows/Build%20and%20Test/badge.svg)](https://github.com/trueb2/hetnetdb/actions)
-
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 # HETNETDB
 
 Hetnetdb is a database that is intended to be extremely flexible and easy to use. In hetnetdb (het, short for heteorogenous, and net, short for networked), the goal is to provide easy access to data in heterogeneous storage platforms and networks via SQL queries. Goals of the database include supporting CSV and JSON stored on multiple storage platforms including local, server, edge, and streaming. To achieve this goal, there will be agent support for browser, iOS, android, linux, and macOS. (Not windows, we specifically don't want to support windows users!). Computational operations will be executed by opaque HTTP endpoints for extreme ease of use.
+
+## Table of Contents
+
+1. [HETNETDB](#hetnetdb)
+    1. [Concessions: IO, Crunch, RAM](#concessions:-io,-crunch,-ram)
+    1. [General Architecture and Nomenclature](#general-architecture-and-nomenclature)
+        1. [Execution Graph Traits and Structs](#execution-graph-traits-and-structs)
+    1. [Topologies](#topologies)
+        1. [v0 target topologies](#v0-target-topologies)
+        1. [v1 target topologies](#v1-target-topologies)
+        1. [v3 target topologies](#v3-target-topologies)
+    1. [Performance Goals](#performance-goals)
+    1. [Development](#development)
+    1. [Example Usage](#example-usage)
+1. [Feature Roadmap and Wish List](#feature-roadmap-and-wish-list)
+1. [Improvement Wish List](#improvement-wish-list)
+1. [Milestone Interactions](#milestone-interactions)
+    1. [First Count Star](#first-count-star)
+    1. [First 100 Million Row Query](#first-100-million-row-query)
+    1. [Drill Benchmarking](#drill-benchmarking)
+    1. [First Executed Graph](#first-executed-graph)
 
 
 ## Concessions: IO, Crunch, RAM
@@ -277,7 +298,7 @@ Average time per request  7ms
 Sample standard deviation 1ms
 ```
 
-### First Executed Graph
+## First Executed Graph
 
 A select star with a reorder, project, and select from cache was run via drill.
 
