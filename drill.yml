@@ -13,7 +13,7 @@ plan:
       body: '{{ item.text }}'
       headers:
         Content-Type: 'application/json'
-        Authorization: 'Bearer NZvsMhczdgmOV00pGYNldWVu9nhhu2tiSgoxfeV/iPY/xq391iVyufvkrndiR433'
+        Authorization: 'Bearer koI0dJPCsTiLr0IEYWobKKgzvgR5dUHy8r2Q0QpNW8wGWdc+2iZlgKqchGw2kcMT'
     with_items_from_csv:
       file_name: queries.txt
       quote_char: "|"

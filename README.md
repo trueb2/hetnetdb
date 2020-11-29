@@ -276,3 +276,124 @@ Median time per request   6ms
 Average time per request  7ms
 Sample standard deviation 1ms
 ```
+
+### First Executed Graph
+
+A select star with a reorder, project, and select from cache was run via drill.
+
+```
+jwtrueb@jbmp hetnetdb % drill --benchmark drill.yml --stats
+Concurrency 4
+Iterations 1000
+Rampup 2
+Base URL http://localhost:6969
+...
+Run queries               http://localhost:6969/query/submit 200 OK 24ms
+Run queries               http://localhost:6969/query/submit 200 OK 24ms
+Run queries               http://localhost:6969/query/submit 200 OK 25ms
+
+Run queries               Total requests            1000
+Run queries               Successful requests       1000
+Run queries               Failed requests           0
+Run queries               Median time per request   17ms
+Run queries               Average time per request  23ms
+Run queries               Sample standard deviation 107ms
+
+Time taken for tests      6.1 seconds
+Total requests            1000
+Successful requests       1000
+Failed requests           0
+Requests per second       165.13 [#/sec]
+Median time per request   17ms
+Average time per request  23ms
+Sample standard deviation 107ms
+```
+
+Here are some log snippets showing how the statement compiled and executed.
+```
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Found SelectStatement: SelectStatement { tables: [Table { name: "hndefault", alias: None }], distinct: false, fields: [All], join: [], where_clause: None, group_by: None, order: None, limit: None }
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Beginning collect for Server(
+        Whole,
+    )
+    NodeInfo {
+        input: Single(
+            HyperNode {
+                name: "project",
+                columns: None,
+                info: NodeInfo {
+                    input: Single(
+                        HyperNode {
+                            name: "select_hndefault",
+                            columns: None,
+                            info: NodeInfo {
+                                input: Leaf,
+                                personality: Leaf(
+                                    Ram(
+                                        "hndefault",
+                                    ),
+                                ),
+                            },
+                            execution_info: Mutex {
+                                is_locked: false,
+                                has_waiters: false,
+                            },
+                        },
+                    ),
+                    personality: Op(
+                        Project,
+                    ),
+                },
+                execution_info: Mutex {
+                    is_locked: false,
+                    has_waiters: false,
+                },
+            },
+        ),
+        personality: Op(
+            Reorder,
+        ),
+    }
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Collecting Op Reorder
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Beginning collect for Server(
+        Whole,
+    )
+    NodeInfo {
+        input: Single(
+            HyperNode {
+                name: "select_hndefault",
+                columns: None,
+                info: NodeInfo {
+                    input: Leaf,
+                    personality: Leaf(
+                        Ram(
+                            "hndefault",
+                        ),
+                    ),
+                },
+                execution_info: Mutex {
+                    is_locked: false,
+                    has_waiters: false,
+                },
+            },
+        ),
+        personality: Op(
+            Project,
+        ),
+    }
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Collecting Op Project
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Beginning collect for Server(
+        Whole,
+    )
+    NodeInfo {
+        input: Leaf,
+        personality: Leaf(
+            Ram(
+                "hndefault",
+            ),
+        ),
+    }
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Collecting Leaf Ram("hndefault")
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Loading table_data from ram cache
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Found table_data with 1 partitions
+[2020-11-29T04:38:35Z TRACE hetnetdb::graph::node] Processing 50 records for partition 0
+```

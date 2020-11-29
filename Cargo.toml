@@ -1,6 +1,6 @@
 [package]
 name = "hetnetdb"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jacob Trueb <jtrueb@northwestern.edu>"]
 edition = "2018"
 

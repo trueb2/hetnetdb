@@ -1,2 +1,2 @@
 text
-|{ "text": "select count(*) from hndefault" }|
+|{ "text": "select * from hndefault" }|
