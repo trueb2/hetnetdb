@@ -10,7 +10,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > /home/rustup.sh 
     chmod +x /home/rustup.sh && \
     /home/rustup.sh -y && \
     . $HOME/.cargo/env && \
-    echo ". $HOME/.cargo/env" >> $HOME/.shrc
+    echo ". $HOME/.cargo/env" >> $HOME/.shrc && \
+    . $HOME/.shrc && \
+    rustup default nightly
 
 RUN mkdir -p /home/app && \
     echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost/hetnetdb" > /home/app/.env && \
