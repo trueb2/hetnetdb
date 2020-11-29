@@ -18,9 +18,8 @@ jobs:
               run: |
                 docker build -t hetnetdb:${GITHUB_SHA} .
                 docker rmi hetnetdb:${GITHUB_SHA}
-    scc_job:
+    scc_loc:
       runs-on: ubuntu-latest
-      name: A code counter with complexity calculations and COCOMO estimates.
       steps:
         - name: Checkout
           uses: actions/checkout@v2
