@@ -571,7 +571,7 @@ mod tests {
     lazy_static! {
         static ref FIXTURE: () = {
             dotenv().ok();
-            env_logger::init();
+            let _ = simple_logger::SimpleLogger::new().init();
             ()
         };
     }

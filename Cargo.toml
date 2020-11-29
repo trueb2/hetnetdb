@@ -16,6 +16,7 @@ async-trait = "0.1.42"
 base64 = "0.13.0"
 bcrypt = "0.9.0"
 chrono = { version = "0.4.19", features = ["serde"] }
+csv = "1.1.4"
 dotenv = "0.15.0"
 diesel = { version = "1.4.5", features = ["postgres", "r2d2", "uuid", "chrono"] }
 diesel_migrations = "1.4.0"
@@ -34,7 +35,7 @@ r2d2 = "0.8.9"
 rand = "0.7.3"
 rust-crypto = "0.2"
 sanitize-filename = "0.3.0"
+serde_urlencoded = "0.7.0"
+simple_logger = "1.11.0"
 typetag = "0.1.6"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
-csv = "1.1.4"
-serde_urlencoded = "0.7.0"
