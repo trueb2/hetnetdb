@@ -1,14 +1,18 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use crate::{AppData, error_handler::CustomError, query::{QueryRecord, SqlType}};
 use crate::tables;
+use crate::{
+    error_handler::CustomError,
+    query::{QueryRecord, SqlType},
+    AppData,
+};
 use async_trait::async_trait;
-use futures::{channel::mpsc::Receiver, channel::mpsc::Sender, lock::Mutex};
-use futures::stream::*;
 use futures::sink::*;
+use futures::stream::*;
+use futures::{channel::mpsc::Receiver, channel::mpsc::Sender, lock::Mutex};
 use nom_sql::{FunctionExpression, SelectStatement, SqlQuery};
-use std::{fmt::Debug, sync::{Arc}};
+use std::{fmt::Debug, sync::Arc};
 
 // Define nodes in the execution graph with definitions based in relational alebra
 // https://en.wikipedia.org/wiki/Relational_algebra
@@ -85,7 +89,11 @@ pub struct ExecuteContext {
 pub trait Node {
     fn input(&self) -> NodeInput;
     fn personality(&self) -> NodeType;
-    async fn curse(&self, ctx: Arc<ExecuteContext>, sender: Sender<Result<QueryRecord, CustomError>>) -> Result<(), CustomError>;
+    async fn curse(
+        &self,
+        ctx: Arc<ExecuteContext>,
+        sender: Sender<Result<QueryRecord, CustomError>>,
+    ) -> Result<(), CustomError>;
 }
 
 #[derive(Debug)]
@@ -139,57 +147,69 @@ pub struct GraphBuilder {
 
 impl WorkNode {
     fn new(ctx: Arc<ExecuteContext>, placement: Placement, info: Arc<NodeInfo>) -> WorkNode {
-        WorkNode { ctx, placement, info }
+        WorkNode {
+            ctx,
+            placement,
+            info,
+        }
     }
 
     /*
      * Traverse the data and emit rows/errors via a sender
      */
-    async fn collect(self: Self, sender: Sender<Result<QueryRecord, CustomError>>, receiver: Option<Receiver<Result<QueryRecord, CustomError>>>) {
-        log::trace!("Beginning collect for {:#?}\n{:#?}", self.placement, self.info);
+    async fn collect(
+        self: Self,
+        sender: Sender<Result<QueryRecord, CustomError>>,
+        receiver: Option<Receiver<Result<QueryRecord, CustomError>>>,
+    ) {
+        log::trace!(
+            "Beginning collect for {:#?}\n{:#?}",
+            self.placement,
+            self.info
+        );
         match &self.info.personality {
             NodeType::Nop => (),
             NodeType::Op(op) => self.collect_op(op, sender, receiver.unwrap()).await,
             NodeType::Leaf(leaf) => self.collect_leaf(leaf, sender).await,
-
         }
     }
 
-    async fn collect_op(self: &Self, op: &OpType, mut sender: Sender<Result<QueryRecord, CustomError>>, mut receiver: Receiver<Result<QueryRecord, CustomError>>) {
+    async fn collect_op(
+        self: &Self,
+        op: &OpType,
+        mut sender: Sender<Result<QueryRecord, CustomError>>,
+        mut receiver: Receiver<Result<QueryRecord, CustomError>>,
+    ) {
         log::trace!("Collecting Op {:?}", op);
         match op {
             OpType::Nop => {}
             OpType::Rename => {}
-            OpType::Reorder => {
-                loop {
-                    match receiver.next().await {
-                        Some(r) => {
-                            log::trace!("OpType::Reorder -> {:?}", r);
-                            if let Err(err) = sender.send(r).await {
-                                log::error!("Send error while reading data for reorder: {:?}", err);
-                                let _ = sender.send(Err(CustomError::from("Send Error")));
-                                return
-                            }
-                        },
-                        None => break
+            OpType::Reorder => loop {
+                match receiver.next().await {
+                    Some(r) => {
+                        log::trace!("OpType::Reorder -> {:?}", r);
+                        if let Err(err) = sender.send(r).await {
+                            log::error!("Send error while reading data for reorder: {:?}", err);
+                            let _ = sender.send(Err(CustomError::from("Send Error")));
+                            return;
+                        }
                     }
+                    None => break,
                 }
-            }
-            OpType::Project => {
-                loop {
-                    match receiver.next().await {
-                        Some(r) => {
-                            log::trace!("OpType::Project -> {:?}", r);
-                            if let Err(err) = sender.send(r).await {
-                                log::error!("Send error while reading data for project: {:?}", err);
-                                let _ = sender.send(Err(CustomError::from("Send Error")));
-                                return
-                            }
-                        },
-                        None => break
+            },
+            OpType::Project => loop {
+                match receiver.next().await {
+                    Some(r) => {
+                        log::trace!("OpType::Project -> {:?}", r);
+                        if let Err(err) = sender.send(r).await {
+                            log::error!("Send error while reading data for project: {:?}", err);
+                            let _ = sender.send(Err(CustomError::from("Send Error")));
+                            return;
+                        }
                     }
+                    None => break,
                 }
-            }
+            },
             OpType::Select => {}
             OpType::Set => {}
             OpType::Join => {}
@@ -199,15 +219,20 @@ impl WorkNode {
         ()
     }
 
-    async fn collect_leaf(self: &Self, leaf: &IoType, mut sender: Sender<Result<QueryRecord, CustomError>>) {
+    async fn collect_leaf(
+        self: &Self,
+        leaf: &IoType,
+        mut sender: Sender<Result<QueryRecord, CustomError>>,
+    ) {
         log::trace!("Collecting Leaf {:?}", leaf);
         match leaf {
             IoType::Ram(table_relation) => {
-                let result = tables::TableRelation::find_by_name(self.ctx.user_id, table_relation.clone());
+                let result =
+                    tables::TableRelation::find_by_name(self.ctx.user_id, table_relation.clone());
                 if let Err(err) = result {
                     log::error!("No table relation found for execution context and graph");
                     let _ = sender.send(Err(err)).await;
-                    return
+                    return;
                 }
 
                 let table_cache_map = self.ctx.app_data.table_cache.lock().await;
@@ -216,13 +241,17 @@ impl WorkNode {
                 if let Some(table_data) = table_cache_map.get(&table.id) {
                     log::trace!("Found table_data with {} partitions", table_data.len());
                     for (i, table_partition) in table_data.into_iter().enumerate() {
-                        log::trace!("Processing {} records for partition {}", table_partition.len(), i);
+                        log::trace!(
+                            "Processing {} records for partition {}",
+                            table_partition.len(),
+                            i
+                        );
                         for r in table_partition {
                             log::trace!("IoType::Ram -> {:?}", r);
                             if let Err(err) = sender.send(Ok(r.clone())).await {
                                 log::error!("Send error while reading data from cache: {:?}", err);
                                 let _ = sender.send(Err(CustomError::from("Send Error")));
-                                return
+                                return;
                             }
                         }
                     }
@@ -258,7 +287,11 @@ impl Node for HyperNode {
         self.info.personality.clone()
     }
 
-    async fn curse(&self, ctx: Arc<ExecuteContext>, sender: Sender<Result<QueryRecord, CustomError>>) -> Result<(), CustomError> {
+    async fn curse(
+        &self,
+        ctx: Arc<ExecuteContext>,
+        sender: Sender<Result<QueryRecord, CustomError>>,
+    ) -> Result<(), CustomError> {
         // TODO: Look up info to determine how to create WorkNode instances
 
         // Continue the recursive opening of channels and flow of data
@@ -271,11 +304,13 @@ impl Node for HyperNode {
                 let work_node = WorkNode::new(ctx.clone(), placement, info);
 
                 actix_rt::spawn(WorkNode::collect(work_node, sender, None));
-            },
-            NodeInput::Single(child) =>  {
+            }
+            NodeInput::Single(child) => {
                 // Create the channel that produces the input for this HyperNode's single input WorkNodes
                 let channel_buf_size = (1 as usize) << 20;
-                let (hyper_sender, hyper_receiver) = futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
+                let (hyper_sender, hyper_receiver) = futures::channel::mpsc::channel::<
+                    Result<QueryRecord, CustomError>,
+                >(channel_buf_size);
 
                 // Create a work node and spawn the work to be done by this HyperNode
                 let placement = Placement::Server(Partition::Whole); // one shot everything
@@ -290,7 +325,7 @@ impl Node for HyperNode {
                 actix_rt::spawn(async move {
                     match child.curse(ctx_clone, hyper_sender).await {
                         Ok(()) => (),
-                        Err(err) => log::error!("Query Execution Error: {:?}", err)
+                        Err(err) => log::error!("Query Execution Error: {:?}", err),
                     }
                     ()
                 });
@@ -298,24 +333,28 @@ impl Node for HyperNode {
             NodeInput::Double(left_child, right_child) => {
                 // Create the channel that produces the input for this HyperNode's left input WorkNodes
                 let channel_buf_size = (1 as usize) << 20;
-                let (hyper_sender, left_receiver) = futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
+                let (hyper_sender, left_receiver) = futures::channel::mpsc::channel::<
+                    Result<QueryRecord, CustomError>,
+                >(channel_buf_size);
                 let ctx_clone = ctx.clone();
                 actix_rt::spawn(async move {
                     match left_child.curse(ctx_clone, hyper_sender).await {
                         Ok(()) => (),
-                        Err(err) => log::error!("Query Execution Error: {:?}", err)
+                        Err(err) => log::error!("Query Execution Error: {:?}", err),
                     }
                     ()
                 });
 
                 // Create the channel that produces the input for this HyperNode's right input WorkNodes
                 let channel_buf_size = (1 as usize) << 20;
-                let (hyper_sender, right_receiver) = futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
+                let (hyper_sender, right_receiver) = futures::channel::mpsc::channel::<
+                    Result<QueryRecord, CustomError>,
+                >(channel_buf_size);
                 let ctx_clone = ctx.clone();
                 actix_rt::spawn(async move {
                     match right_child.curse(ctx_clone, hyper_sender).await {
                         Ok(()) => (),
-                        Err(err) => log::error!("Query Execution Error: {:?}", err)
+                        Err(err) => log::error!("Query Execution Error: {:?}", err),
                     }
                     ()
                 });
@@ -354,24 +393,29 @@ impl Node for RootNode {
         }
     }
 
-    async fn curse(&self, ctx: Arc<ExecuteContext>, sender: Sender<Result<QueryRecord, CustomError>>) -> Result<(), CustomError> {
+    async fn curse(
+        &self,
+        ctx: Arc<ExecuteContext>,
+        sender: Sender<Result<QueryRecord, CustomError>>,
+    ) -> Result<(), CustomError> {
         let mut sender = sender;
 
         // Create channels to connect each HyperNode, returning the root-level channel receiver
         let root = match self.graph {
             Some(ref n) => n.clone(),
-            None => return Err(CustomError::from("Cannot curse from root without graph"))
+            None => return Err(CustomError::from("Cannot curse from root without graph")),
         };
 
         // Create the channel that produces the data acutally returned by the root
         let channel_buf_size = (1 as usize) << 20;
-        let (root_sender, mut root_receiver) = futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
+        let (root_sender, mut root_receiver) =
+            futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
 
         // Begin the recursive opening of channels and flow of data
         actix_rt::spawn(async move {
             match root.curse(ctx, root_sender).await {
                 Ok(()) => (),
-                Err(err) => log::error!("Query Execution Error: {:?}", err)
+                Err(err) => log::error!("Query Execution Error: {:?}", err),
             }
             ()
         });
@@ -379,16 +423,17 @@ impl Node for RootNode {
         // Process chunks of data from downstream, moving them upstream or erroring
         loop {
             match root_receiver.next().await {
-                Some(r) => {
-                    match sender.send(r).await {
-                        Ok(()) => (),
-                        Err(err) => {
-                            log::error!("Query Execution Error: {:?}", err);
-                            return Err(CustomError::from(format!("Query Execution Error: {:?}", err)))
-                        }
+                Some(r) => match sender.send(r).await {
+                    Ok(()) => (),
+                    Err(err) => {
+                        log::error!("Query Execution Error: {:?}", err);
+                        return Err(CustomError::from(format!(
+                            "Query Execution Error: {:?}",
+                            err
+                        )));
                     }
-                }
-                None => break
+                },
+                None => break,
             }
         }
 
@@ -487,7 +532,7 @@ impl GraphInflator {
         let columns = None;
         for f in select_stmt.fields.into_iter() {
             match f {
-                nom_sql::FieldDefinitionExpression::All => { }
+                nom_sql::FieldDefinitionExpression::All => {}
                 nom_sql::FieldDefinitionExpression::AllInTable(_) => {
                     return Err(CustomError::from("Unsupported Statement"))
                 }

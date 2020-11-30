@@ -1,0 +1,2 @@
+[env]
+CARGO_MAKE_COVERAGE_PROVIDER = "tarpaulin"

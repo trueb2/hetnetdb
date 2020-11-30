@@ -9,15 +9,38 @@ on:
         - master
 
 jobs:
-    debug-ci:
+    build:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout Code
               uses: actions/checkout@v1
-            - name: Build and Test
+            - name: Build Image
               run: |
-                docker build -t hetnetdb:${GITHUB_SHA} .
-                docker rmi hetnetdb:${GITHUB_SHA}
+                docker build -t hetnetdb:${GITHUB_SHA} . &&
+                echo ${{secrets.GITHUB_TOKEN}} | docker login https://docker.pkg.github.com -u trueb2 --password-stdin && \
+                docker tag hetnetdb:${GITHUB_SHA} docker.pkg.github.com/trueb2/hetnetdb/hetnetdb:${GITHUB_SHA}
+                docker push docker.pkg.github.com/trueb2/hetnetdb/hetnetdb:${GITHUB_SHA}
+    test:
+        needs: build
+        runs-on: ubuntu-latest
+        container:
+            image: docker.pkg.github.com/trueb2/hetnetdb/hetnetdb:${{github.sha}}
+            credentials:
+                username: trueb2
+                password: ${{ github.token }}
+            options: --security-opt seccomp=unconfined
+        steps:
+          - name: Checkout repository
+            uses: actions/checkout@v2
+          - name: Test
+            run: |
+              export HOME=/root && source ~/.cargo/env && echo $PATH && \
+              pg_ctlcluster 12 main start -- -t 300 && \
+              rm -f .env && cp /home/app/.env . && \
+              cargo make --makefile Makefile.toml ci-flow
+            shell: bash
+            env:
+              CARGO_MAKE_RUN_CODECOV: true
     scc_loc:
       runs-on: ubuntu-latest
       steps:
@@ -27,4 +50,5 @@ jobs:
           id: scc
           uses: iryanbell/scc-docker-action@v1.0.0
           with:
-            args: ${{ env.workspace }}
+            args: ${{env.workspace}}
+

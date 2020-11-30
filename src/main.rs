@@ -581,7 +581,7 @@ mod tests {
         // assert_eq!(result.records[0].columns[0]["i64"], 20);
     }
 
-       #[actix_rt::test]
+    #[actix_rt::test]
     async fn _test_select_star() {
         setup();
         let mut app = test::init_service(AppFactory!(APP_DATA.clone())()).await;

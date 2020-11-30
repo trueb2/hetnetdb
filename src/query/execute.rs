@@ -1,11 +1,11 @@
 use std::sync::{Arc, RwLock};
 
 use super::query::*;
-use crate::{error_handler::*, users::User, AppData, graph};
+use crate::{error_handler::*, graph, users::User, AppData};
 // use futures::channel::mpsc::{ channel};
-use futures_util::StreamExt;
 use futures_util::future;
 use futures_util::task::Poll;
+use futures_util::StreamExt;
 use graph::ExecuteContext;
 use log;
 use serde::Deserialize;
@@ -43,8 +43,12 @@ impl Execution {
 
         // Create a channel to receive rows processed by the execution graph
         let channel_buf_size = (1 as usize) << 20;
-        let (sender, receiver) = futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
-        let ctx = Arc::new(ExecuteContext { user_id: user.id, app_data });
+        let (sender, receiver) =
+            futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
+        let ctx = Arc::new(ExecuteContext {
+            user_id: user.id,
+            app_data,
+        });
         root.curse(ctx, sender).await?;
 
         // Collect all of the records emitted to the channel
@@ -65,7 +69,7 @@ impl Execution {
                 return match &*error {
                     Some(_) => Poll::Ready(()),
                     None => Poll::Pending,
-                }
+                };
             }))
             .map(Result::ok)
             .map(Option::unwrap)
@@ -73,7 +77,8 @@ impl Execution {
             .await;
 
         // Report errors
-        match error.into_inner().unwrap() { // We die
+        match error.into_inner().unwrap() {
+            // We die
             Some(err) => Err(err.clone()),
             None => {
                 // Package up the results and return
@@ -81,7 +86,11 @@ impl Execution {
                     records,
                     ..Default::default()
                 };
-                log::info!("Query {} produced {} records", query_id, query_result.records.len());
+                log::info!(
+                    "Query {} produced {} records",
+                    query_id,
+                    query_result.records.len()
+                );
                 Ok(query_result)
             }
         }
