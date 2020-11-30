@@ -3,6 +3,7 @@
 [![Codecov](https://img.shields.io/codecov/c/gh/trueb2/hetnetdb?token=NFPG957XLI)](https://codecov.io/gh/trueb2/hetnetdb)
 [![Crates.io](https://img.shields.io/crates/v/hetnetdb)](https://crates.io/hetnetdb)
 [![Crates.io](https://img.shields.io/crates/d/hetnetdb?label=downloads)](https://crates.io/hetnetdb)
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Ftrueb2%2Fhetnetdb&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
 ![GitHub contributors](https://img.shields.io/github/contributors/trueb2/hetnetdb)
 ![GitHub Release Date](https://img.shields.io/github/release-date/trueb2/hetnetdb)
 ![Scc Count Badge](https://sloc.xyz/github/trueb2/hetnetdb/)
