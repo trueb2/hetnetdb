@@ -2,6 +2,7 @@
 name = "hetnetdb"
 version = "0.1.1"
 authors = ["Jacob Trueb <trueb2@illinois.edu>"]
+description = "Easy-to-Use Heterogenous SQL Database"
 edition = "2018"
 readme = "README.md"
 license = "GNU GPLv3"
