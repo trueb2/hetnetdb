@@ -38,7 +38,7 @@ jobs:
             run: |
               export HOME=/root && source ~/.cargo/env && echo $PATH && \
               pg_ctlcluster 12 main start -- -t 300 && \
-              rm -f .env && cp /home/app/.env . && \
+              cp /home/app/.env . && cat .env && \
               cargo make --makefile Makefile.toml ci-flow
             shell: bash
             env:
