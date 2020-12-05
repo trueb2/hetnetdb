@@ -7,8 +7,8 @@ RUN apt update && \
         apt-utils gcc libzmq3-dev \
         wget sudo unzip \
         build-essential glances htop vim tree curl \
-        postgresql postgresql-common postgresql-client \
-        postgresql-contrib libpq-dev \
+        postgresql postgresql-common postgresql-client postgresql-contrib \
+        libpq-dev libmysqlclient-dev libsqlite3-dev \
         libssl-dev pkg-config && \
     apt clean
 
@@ -26,9 +26,7 @@ RUN mkdir -p /home/app && \
     echo "RUST_LOG=trace" >> /home/app/.env
 
 RUN . $HOME/.shrc && \
-    cargo install diesel_cli --no-default-features --features postgres && \
-    cargo install cargo-make && \
-    cargo install cargo-tarpaulin
+    cargo install diesel_cli cargo-make cargo-tarpaulin
 
 COPY migrations /home/app/migrations/
 COPY src /home/app/src/
