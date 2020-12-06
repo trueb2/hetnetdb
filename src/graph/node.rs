@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use futures::sink::*;
 use futures::stream::*;
 use futures::{channel::mpsc::Receiver, channel::mpsc::Sender, lock::Mutex};
-use nom_sql::{FunctionExpression, SelectStatement, SqlQuery};
+use nom_sql::{ConditionExpression, FunctionExpression, SelectStatement, SqlQuery};
 use std::{fmt::Debug, sync::Arc};
 
 // Define nodes in the execution graph with definitions based in relational alebra
@@ -76,7 +76,7 @@ pub enum NodeInput {
     None,
     Single(Arc<HyperNode>),
     Double(Arc<HyperNode>, Arc<HyperNode>),
-    Leaf,
+    Leaf(Option<ConditionExpression>),
 }
 
 #[derive(Clone)]
@@ -143,6 +143,42 @@ pub enum Placement {
 pub struct GraphBuilder {
     query_id: i64,
     root: Arc<RootNode>,
+}
+
+pub struct ConditionPredicate {
+    guard: Box<dyn Fn(QueryRecord) -> bool>,
+}
+
+impl ConditionPredicate {
+    pub fn try_from(
+        condition: &Option<ConditionExpression>,
+    ) -> Result<Option<ConditionPredicate>, CustomError> {
+        match condition {
+            Some(condition) => match condition {
+                ConditionExpression::ComparisonOp(_) => {
+                    return Err(CustomError::from("Unsupported Statement"))
+                }
+                ConditionExpression::LogicalOp(_) => {
+                    return Err(CustomError::from("Unsupported Statement"))
+                }
+                ConditionExpression::NegationOp(_) => {
+                    return Err(CustomError::from("Unsupported Statement"))
+                }
+                ConditionExpression::Base(_) => {
+                    return Err(CustomError::from("Unsupported Statement"))
+                }
+                ConditionExpression::Arithmetic(_) => {
+                    return Err(CustomError::from("Unsupported Statement"))
+                }
+                ConditionExpression::Bracketed(_) => {
+                    return Err(CustomError::from("Unsupported Statement"))
+                }
+            },
+            None => {
+                return Ok(None);
+            }
+        }
+    }
 }
 
 impl WorkNode {
@@ -233,6 +269,23 @@ impl WorkNode {
                     return;
                 }
 
+                let condition = match self.info.input {
+                    NodeInput::Leaf(ref condition) => condition,
+                    _ => {
+                        panic!("Invalid input for WorkNode::collect_leaf()")
+                    }
+                };
+
+                let predicate = ConditionPredicate::try_from(condition);
+                if let Err(err) = result {
+                    log::error!(
+                        "Failed to prepare predicate for condition: {:#?}",
+                        condition
+                    );
+                    let _ = sender.send(Err(err)).await;
+                    return;
+                }
+
                 let table_cache_map = self.ctx.app_data.table_cache.lock().await;
                 let table = result.unwrap();
                 log::trace!("Loading table_data from ram cache");
@@ -240,12 +293,11 @@ impl WorkNode {
                     log::trace!("Found table_data with {} partitions", table_data.len());
                     for (i, table_partition) in table_data.iter().enumerate() {
                         log::trace!(
-                            "Processing {} records for partition {}",
+                            "IoType::Ram -> Processing {} records for partition {}",
                             table_partition.len(),
                             i
                         );
                         for r in table_partition {
-                            log::trace!("IoType::Ram -> {:?}", r);
                             if let Err(err) = sender.send(Ok(r.clone())).await {
                                 log::error!("Send error while reading data from cache: {:?}", err);
                                 let _ = sender.send(Err(CustomError::from("Send Error")));
@@ -295,7 +347,7 @@ impl Node for HyperNode {
         // Continue the recursive opening of channels and flow of data
         match self.input() {
             NodeInput::None => (),
-            NodeInput::Leaf => {
+            NodeInput::Leaf(_condition) => {
                 // Create a work node and spawn the work to be done by this HyperNode
                 let placement = Placement::Server(Partition::Whole); // one shot everything
                 let info = self.info.clone(); // work node knows about inputs and partitioning now
@@ -467,13 +519,14 @@ impl GraphBuilder {
         &mut self,
         project_columns: Option<Vec<String>>,
         input_relation: String,
+        condition: Option<ConditionExpression>,
     ) -> &mut Self {
         // First: setup where the data comes from
         let select_node = Arc::new(HyperNode::new(
             format!("select_{}", input_relation),
             None,
             NodeInfo {
-                input: NodeInput::Leaf,
+                input: NodeInput::Leaf(condition),
                 personality: NodeType::Leaf(IoType::Ram(input_relation.to_lowercase())),
             },
         ));
@@ -572,7 +625,7 @@ impl GraphInflator {
             _ => return Err(CustomError::from("Unsupported number of tables")),
         };
 
-        builder.add_subselect(columns, table_name);
+        builder.add_subselect(columns, table_name, select_stmt.where_clause);
 
         Ok(())
     }
@@ -641,6 +694,161 @@ mod tests {
         let root = GraphInflator::new().inflate(1, sql_query).await.unwrap();
         log::trace!("Inflated execution graph: {:?}", root.as_ref());
 
-        // TODO
+        // TODO: we have end to end coverage of these tests, but it would e good to have chunked unit test coverage instead
+    }
+
+    #[actix_rt::test]
+    async fn test_condition_predicate_comparison() {
+        setup();
+
+        for query in [
+            "SELECT * FROM FOO WHERE c0 = 1",
+            "SELECT * FROM FOO WHERE c0 > c1",
+        ]
+        .iter()
+        {
+            let sql_query = parse_query(query).expect("Failed to parse test query");
+            log::trace!("Testing condition predicate from {:#?}", sql_query);
+
+            if let SqlQuery::Select(select_stmt) = sql_query {
+                let predicate = ConditionPredicate::try_from(&select_stmt.where_clause);
+                assert!(predicate.is_err());
+
+                // TODO: we want is_ok and check correctness
+            } else {
+                assert!(false);
+            }
+        }
+    }
+    #[actix_rt::test]
+    async fn test_condition_predicate_logical() {
+        setup();
+
+        for query in [
+            "SELECT * FROM FOO WHERE c0 != 1 AND c1 <= c0",
+            "SELECT * FROM FOO WHERE c3 OR c1 < c2",
+        ]
+        .iter()
+        {
+            let sql_query = parse_query(query).expect("Failed to parse test query");
+            log::trace!("Testing condition predicate from {:#?}", sql_query);
+
+            if let SqlQuery::Select(select_stmt) = sql_query {
+                let predicate = ConditionPredicate::try_from(&select_stmt.where_clause);
+                assert!(predicate.is_err());
+
+                // TODO: we want is_ok and check correctness
+            } else {
+                assert!(false);
+            }
+        }
+    }
+
+    #[actix_rt::test]
+    async fn test_condition_predicate_negation() {
+        setup();
+
+        for query in [
+            "SELECT * FROM FOO WHERE NOT c0 < 1",
+            "SELECT * FROM FOO WHERE NOT c0 != 1 AND c1 >= c0",
+            "SELECT * FROM FOO WHERE c3 OR NOT c1 < c2",
+            "SELECT * FROM FOO WHERE  NOT (c1 < c2 AND c0)",
+        ]
+        .iter()
+        {
+            let sql_query = parse_query(query).expect("Failed to parse test query");
+            log::trace!("Testing condition predicate from {:#?}", sql_query);
+
+            if let SqlQuery::Select(select_stmt) = sql_query {
+                let predicate = ConditionPredicate::try_from(&select_stmt.where_clause);
+                assert!(predicate.is_err());
+
+                // TODO: we want is_ok and check correctness
+            } else {
+                assert!(false);
+            }
+        }
+    }
+    #[actix_rt::test]
+    async fn test_condition_predicate_base() {
+        setup();
+
+        // Field, Literal, Literal List, NestedSelect
+
+        for query in [
+            "SELECT * FROM FOO WHERE c0",
+            "SELECT * FROM FOO WHERE false OR true",
+            "SELECT * FROM FOO WHERE 2 in (1, 2, 3)",
+            "SELECT * FROM FOO WHERE  (SELECT true from BAR)",
+        ]
+        .iter()
+        {
+            let sql_query = parse_query(query).expect("Failed to parse test query");
+            log::trace!("Testing condition predicate from {:#?}", sql_query);
+
+            if let SqlQuery::Select(select_stmt) = sql_query {
+                let predicate = ConditionPredicate::try_from(&select_stmt.where_clause);
+                assert!(predicate.is_err());
+
+                // TODO: we want is_ok and check correctness
+            } else {
+                assert!(false);
+            }
+        }
+    }
+
+    #[actix_rt::test]
+    async fn test_condition_predicate_arithmetic() {
+        setup();
+
+        // Field, Literal, Literal List, NestedSelect
+
+        for query in [
+            "SELECT * FROM FOO WHERE c0 - 1 = 0",
+            "SELECT * FROM FOO WHERE c2 * 3 > 9",
+            "SELECT * FROM FOO WHERE 10 <= c4 / 11",
+        ]
+        .iter()
+        {
+            let sql_query = parse_query(query).expect("Failed to parse test query");
+            log::trace!("Testing condition predicate from {:#?}", sql_query);
+
+            if let SqlQuery::Select(select_stmt) = sql_query {
+                let predicate = ConditionPredicate::try_from(&select_stmt.where_clause);
+                assert!(predicate.is_err());
+
+                // TODO: we want is_ok and check correctness
+            } else {
+                assert!(false);
+            }
+        }
+    }
+
+    #[actix_rt::test]
+    async fn test_condition_predicate_bracketed() {
+        setup();
+
+        for query in [
+            "SELECT * FROM FOO WHERE (c0 - 1) = 0",
+            "SELECT * FROM FOO WHERE 0 = (c0 - 1)",
+            // "SELECT * FROM FOO WHERE c0 - 1 = (0)",
+            // "SELECT * FROM FOO WHERE 9 < (c2 * 3 + 1)",
+            // "SELECT * FROM FOO WHERE 10 <= ((c4) / 11)",
+            // "SELECT * FROM FOO WHERE (10 <= ((c4) / 11))",
+        ]
+        .iter()
+        {
+            let sql_query = parse_query(query).expect("Failed to parse test query");
+            log::trace!("Testing condition predicate from {:#?}", sql_query);
+
+            if let SqlQuery::Select(select_stmt) = sql_query {
+                let predicate = ConditionPredicate::try_from(&select_stmt.where_clause);
+                assert!(predicate.is_err());
+
+                // TODO: we want is_ok and check correctness
+            } else {
+                assert!(false);
+            }
+        }
     }
 }
