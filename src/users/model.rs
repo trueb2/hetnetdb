@@ -88,7 +88,7 @@ pub fn symmetric_encrypt(
                 .take_read_buffer()
                 .take_remaining()
                 .iter()
-                .map(|&i| i),
+                .copied(),
         );
         match pass_result {
             BufferResult::BufferUnderflow => break,
@@ -119,7 +119,7 @@ pub fn symmetric_decrypt(
                 .take_read_buffer()
                 .take_remaining()
                 .iter()
-                .map(|&i| i),
+                .copied(),
         );
         match pass_result {
             BufferResult::BufferUnderflow => break,
@@ -172,7 +172,7 @@ impl User {
         let message = symmetric_decrypt(token.as_slice(), &key, &iv)?;
         let message = String::from_utf8(message)?;
         log::trace!("Parsing token: [{}]", message);
-        let parts: Vec<&str> = message.split("$").collect();
+        let parts: Vec<&str> = message.split('$').collect();
         if parts.len() != 5 {
             return Err(CustomError {
                 error_message: String::from("Unauthorized"),
@@ -200,7 +200,7 @@ impl User {
         let password_hash = Self::internal_token(user.username.clone(), user.password)?;
         let insertable_user = InsertableUser {
             username: user.username.clone(),
-            password_hash: password_hash,
+            password_hash,
         };
         let user = diesel::update(users::table)
             .filter(users::id.eq(id))
@@ -268,9 +268,6 @@ impl std::convert::TryInto<AuthUser> for User {
         let token = symmetric_encrypt(seed.as_bytes(), &key, &iv)?;
         let token = base64::encode(token.as_slice());
 
-        Ok(AuthUser {
-            id: self.id,
-            token: token,
-        })
+        Ok(AuthUser { id: self.id, token })
     }
 }

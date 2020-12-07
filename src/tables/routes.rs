@@ -79,7 +79,7 @@ async fn upload(
                 .unwrap()
                 .push(uploaded_records);
         } else {
-            table_cache_map.insert(table.id.clone(), vec![uploaded_records]);
+            table_cache_map.insert(table.id, vec![uploaded_records]);
         }
     }
 

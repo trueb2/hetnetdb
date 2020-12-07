@@ -5,7 +5,7 @@ use std::{any::Any, fmt::Debug};
 #[typetag::serde]
 pub trait SqlType: DynClone + Debug + Send {
     fn name(self) -> String;
-    fn value(self: &mut Self) -> Box<dyn Any>;
+    fn value(&mut self) -> Box<dyn Any>;
 }
 dyn_clone::clone_trait_object!(SqlType);
 
@@ -14,7 +14,7 @@ impl SqlType for String {
     fn name(self) -> String {
         "STRING".into()
     }
-    fn value(self: &mut Self) -> Box<dyn Any> {
+    fn value(&mut self) -> Box<dyn Any> {
         Box::new(self.clone())
     }
 }
@@ -24,8 +24,8 @@ impl SqlType for i64 {
     fn name(self) -> String {
         "I64".into()
     }
-    fn value(self: &mut Self) -> Box<dyn Any> {
-        Box::new(self.clone())
+    fn value(&mut self) -> Box<dyn Any> {
+        Box::new(*self)
     }
 }
 
@@ -34,8 +34,8 @@ impl SqlType for f64 {
     fn name(self) -> String {
         "F64".into()
     }
-    fn value(self: &mut Self) -> Box<dyn Any> {
-        Box::new(self.clone())
+    fn value(&mut self) -> Box<dyn Any> {
+        Box::new(*self)
     }
 }
 
@@ -47,7 +47,7 @@ impl SqlType for Null {
     fn name(self) -> String {
         "NULL".into()
     }
-    fn value(self: &mut Self) -> Box<dyn Any> {
+    fn value(&mut self) -> Box<dyn Any> {
         Box::new(Null {})
     }
 }

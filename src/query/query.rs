@@ -67,7 +67,7 @@ pub struct QueryRecordBuilder {
 impl QueryRecordBuilder {
     pub fn new(table_schema: &TableSchema) -> QueryRecordBuilder {
         let into_types = (&table_schema.column_types)
-            .into_iter()
+            .iter()
             .map(|type_string| {
                 let into_type: Box<dyn Fn(String) -> Result<Box<dyn SqlType>, CustomError>> =
                     match type_string.as_str() {
@@ -80,17 +80,15 @@ impl QueryRecordBuilder {
             })
             .collect();
 
-        QueryRecordBuilder {
-            into_types: into_types,
-        }
+        QueryRecordBuilder { into_types }
     }
 
-    pub fn from_vec(self: &Self, columns: Vec<String>) -> Result<QueryRecord, CustomError> {
+    pub fn from_vec(&self, columns: Vec<String>) -> Result<QueryRecord, CustomError> {
         let mut record = QueryRecord {
             ..Default::default()
         };
         let columns: Result<Vec<Box<dyn SqlType>>, _> = (&self.into_types)
-            .into_iter()
+            .iter()
             .zip(columns.into_iter())
             .map(|item| item.0(item.1))
             .collect();

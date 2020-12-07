@@ -107,7 +107,6 @@ mod tests {
             let _ = simple_logger::SimpleLogger::new().init();
             db::init();
             auth::init();
-            ()
         };
         static ref ADMIN_USER: users::AuthUser = {
             let user = users::User::create(users::MaybeUser {

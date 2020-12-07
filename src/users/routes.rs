@@ -4,7 +4,7 @@ use actix_web::{dev::Payload, post, put, web, FromRequest, HttpRequest, HttpResp
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use futures::executor::block_on;
 use futures_util::future::{err, ok, Ready};
-use log;
+
 use std::convert::TryInto;
 
 impl FromRequest for User {
@@ -22,7 +22,7 @@ impl FromRequest for User {
             Ok(user) => user,
             Err(error) => match error.error_status_code {
                 404 => return err(CustomError::new(401, String::from("Unauthorized"))),
-                _ => return err(Self::Error::from(error)),
+                _ => return err(error),
             },
         };
         ok(user)

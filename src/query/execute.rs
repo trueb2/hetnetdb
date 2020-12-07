@@ -7,7 +7,7 @@ use futures_util::future;
 use futures_util::task::Poll;
 use futures_util::StreamExt;
 use graph::ExecuteContext;
-use log;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -42,7 +42,7 @@ impl Execution {
             .await?;
 
         // Create a channel to receive rows processed by the execution graph
-        let channel_buf_size = (1 as usize) << 20;
+        let channel_buf_size = 1_usize << 20;
         let (sender, receiver) =
             futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
         let ctx = Arc::new(ExecuteContext {
@@ -66,10 +66,10 @@ impl Execution {
             })
             .take_until(future::poll_fn(|_ctx| {
                 let error = error.read().unwrap();
-                return match &*error {
+                match &*error {
                     Some(_) => Poll::Ready(()),
                     None => Poll::Pending,
-                };
+                }
             }))
             .map(Result::ok)
             .map(Option::unwrap)
@@ -79,7 +79,7 @@ impl Execution {
         // Report errors
         match error.into_inner().unwrap() {
             // We die
-            Some(err) => Err(err.clone()),
+            Some(err) => Err(err),
             None => {
                 // Package up the results and return
                 let query_result = QueryResult {

@@ -158,7 +158,7 @@ impl WorkNode {
      * Traverse the data and emit rows/errors via a sender
      */
     async fn collect(
-        self: Self,
+        self,
         sender: Sender<Result<QueryRecord, CustomError>>,
         receiver: Option<Receiver<Result<QueryRecord, CustomError>>>,
     ) {
@@ -175,7 +175,7 @@ impl WorkNode {
     }
 
     async fn collect_op(
-        self: &Self,
+        &self,
         op: &OpType,
         mut sender: Sender<Result<QueryRecord, CustomError>>,
         mut receiver: Receiver<Result<QueryRecord, CustomError>>,
@@ -215,12 +215,10 @@ impl WorkNode {
             OpType::Join => {}
             OpType::Agg => {}
         }
-
-        ()
     }
 
     async fn collect_leaf(
-        self: &Self,
+        &self,
         leaf: &IoType,
         mut sender: Sender<Result<QueryRecord, CustomError>>,
     ) {
@@ -240,7 +238,7 @@ impl WorkNode {
                 log::trace!("Loading table_data from ram cache");
                 if let Some(table_data) = table_cache_map.get(&table.id) {
                     log::trace!("Found table_data with {} partitions", table_data.len());
-                    for (i, table_partition) in table_data.into_iter().enumerate() {
+                    for (i, table_partition) in table_data.iter().enumerate() {
                         log::trace!(
                             "Processing {} records for partition {}",
                             table_partition.len(),
@@ -301,13 +299,13 @@ impl Node for HyperNode {
                 // Create a work node and spawn the work to be done by this HyperNode
                 let placement = Placement::Server(Partition::Whole); // one shot everything
                 let info = self.info.clone(); // work node knows about inputs and partitioning now
-                let work_node = WorkNode::new(ctx.clone(), placement, info);
+                let work_node = WorkNode::new(ctx, placement, info);
 
                 actix_rt::spawn(WorkNode::collect(work_node, sender, None));
             }
             NodeInput::Single(child) => {
                 // Create the channel that produces the input for this HyperNode's single input WorkNodes
-                let channel_buf_size = (1 as usize) << 20;
+                let channel_buf_size = 1_usize << 20;
                 let (hyper_sender, hyper_receiver) = futures::channel::mpsc::channel::<
                     Result<QueryRecord, CustomError>,
                 >(channel_buf_size);
@@ -321,18 +319,17 @@ impl Node for HyperNode {
                 actix_rt::spawn(WorkNode::collect(work_node, sender, Some(hyper_receiver)));
 
                 // Spawn the children to produce data for the worker
-                let ctx_clone = ctx.clone();
+                let ctx_clone = ctx;
                 actix_rt::spawn(async move {
                     match child.curse(ctx_clone, hyper_sender).await {
                         Ok(()) => (),
                         Err(err) => log::error!("Query Execution Error: {:?}", err),
                     }
-                    ()
                 });
             }
             NodeInput::Double(left_child, right_child) => {
                 // Create the channel that produces the input for this HyperNode's left input WorkNodes
-                let channel_buf_size = (1 as usize) << 20;
+                let channel_buf_size = 1_usize << 20;
                 let (hyper_sender, left_receiver) = futures::channel::mpsc::channel::<
                     Result<QueryRecord, CustomError>,
                 >(channel_buf_size);
@@ -342,21 +339,19 @@ impl Node for HyperNode {
                         Ok(()) => (),
                         Err(err) => log::error!("Query Execution Error: {:?}", err),
                     }
-                    ()
                 });
 
                 // Create the channel that produces the input for this HyperNode's right input WorkNodes
-                let channel_buf_size = (1 as usize) << 20;
+                let channel_buf_size = 1_usize << 20;
                 let (hyper_sender, right_receiver) = futures::channel::mpsc::channel::<
                     Result<QueryRecord, CustomError>,
                 >(channel_buf_size);
-                let ctx_clone = ctx.clone();
+                let ctx_clone = ctx;
                 actix_rt::spawn(async move {
                     match right_child.curse(ctx_clone, hyper_sender).await {
                         Ok(()) => (),
                         Err(err) => log::error!("Query Execution Error: {:?}", err),
                     }
-                    ()
                 });
 
                 todo!();
@@ -407,7 +402,7 @@ impl Node for RootNode {
         };
 
         // Create the channel that produces the data acutally returned by the root
-        let channel_buf_size = (1 as usize) << 20;
+        let channel_buf_size = 1_usize << 20;
         let (root_sender, mut root_receiver) =
             futures::channel::mpsc::channel::<Result<QueryRecord, CustomError>>(channel_buf_size);
 
@@ -417,7 +412,6 @@ impl Node for RootNode {
                 Ok(()) => (),
                 Err(err) => log::error!("Query Execution Error: {:?}", err),
             }
-            ()
         });
 
         // Process chunks of data from downstream, moving them upstream or erroring
@@ -470,7 +464,7 @@ impl GraphBuilder {
     }
 
     fn add_subselect(
-        self: &mut Self,
+        &mut self,
         project_columns: Option<Vec<String>>,
         input_relation: String,
     ) -> &mut Self {
@@ -617,7 +611,6 @@ mod tests {
         static ref FIXTURE: () = {
             dotenv().ok();
             let _ = simple_logger::SimpleLogger::new().init();
-            ()
         };
     }
 

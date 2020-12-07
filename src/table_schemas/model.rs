@@ -54,7 +54,7 @@ impl TableSchema {
         Ok(table_schema)
     }
 
-    pub fn verify(self: &Self, raw_data: Vec<u8>) -> Result<Vec<QueryRecord>, CustomError> {
+    pub fn verify(&self, raw_data: Vec<u8>) -> Result<Vec<QueryRecord>, CustomError> {
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(false)
             .from_reader(raw_data.as_slice());
