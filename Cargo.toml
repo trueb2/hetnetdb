@@ -35,7 +35,7 @@ diesel_migrations = "1.4.0"
 dyn-clone = "1.0.4"
 env_logger = "0.8.2"
 futures = { version = "0.3.11", features = ["compat"] }
-futures-util = "0.3.11"
+futures-util = "0.3.12"
 http = "0.2"
 lazy_static = "1.4.0"
 listenfd = "0.3.3"
