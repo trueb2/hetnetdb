@@ -150,9 +150,9 @@ dependencies = [
 
 [[package]]
 name = "actix-rt"
-version = "2.0.2"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c88cf46527e27f66efcd5831f60b3d9c2dac795b6d255ed17791752d6c36a8ea"
+checksum = "0b4e57bc1a3915e71526d128baf4323700bd1580bc676239e2298a4c5b001f18"
 dependencies = [
  "actix-macros 0.2.0",
  "futures-core",
@@ -630,9 +630,9 @@ dependencies = [
 
 [[package]]
 name = "csv"
-version = "1.1.5"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9d58633299b24b515ac72a3f869f8b91306a3cec616a602843a383acd6f9e97"
+checksum = "22813a6dc45b335f9bade10bf7271dc477e81113e89eb251a0bc2a8a81c536e1"
 dependencies = [
  "bstr",
  "csv-core",
@@ -1045,7 +1045,7 @@ name = "hetnetdb"
 version = "0.1.1"
 dependencies = [
  "actix-multipart",
- "actix-rt 2.0.2",
+ "actix-rt 2.1.0",
  "actix-service",
  "actix-web",
  "actix-web-httpauth",
@@ -1890,18 +1890,18 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.123"
+version = "1.0.124"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92d5161132722baa40d802cc70b15262b98258453e85e5d1d365c757c73869ae"
+checksum = "bd761ff957cb2a45fbb9ab3da6512de9de55872866160b23c25f1a841e99d29f"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.123"
+version = "1.0.124"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9391c295d64fc0abb2c556bad848f33cb8296276b1ad2677d1ae1ace4f258f31"
+checksum = "1800f7693e94e186f5e25a28291ae1570da908aff7d97a095dec1e56ff99069b"
 dependencies = [
  "proc-macro2",
  "quote",
